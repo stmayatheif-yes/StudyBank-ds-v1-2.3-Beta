@@ -58,6 +58,20 @@ button,a{font:inherit;color:var(--ink)}
 #resCard table{width:100%;border-collapse:collapse;margin:6px 0;white-space:normal}
 #resCard th,#resCard td{text-align:left;padding:2px 4px;border-bottom:1px solid rgba(29,58,53,.12);font-size:.8rem}
 #debug{position:fixed;left:8px;right:8px;top:calc(104px + env(safe-area-inset-top,0px));max-height:42vh;display:none;flex-direction:column;padding:10px 12px;overflow:auto;z-index:8;font:12px/1.55 ui-monospace,monospace;white-space:pre-wrap}
+#roster,#chron{position:fixed;left:8px;right:8px;top:calc(104px + env(safe-area-inset-top,0px));bottom:calc(8px + env(safe-area-inset-bottom,0px));display:none;flex-direction:column;padding:12px;overflow:hidden;z-index:6}
+#roster .eh,#chron .eh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px}
+#roster button,#chron button,#roster select{padding:4px 10px;border-radius:8px;border:1px solid rgba(29,58,53,.3);background:rgba(255,255,255,.35);cursor:pointer;font:inherit;color:var(--ink)}
+#rosterBody,#chronBody{overflow:auto;font-size:.86rem;line-height:1.65}
+#rosterBody table{width:100%;border-collapse:collapse;margin:4px 0}
+#rosterBody th,#rosterBody td{text-align:left;padding:4px 5px;border-bottom:1px solid rgba(29,58,53,.14);font-size:.82rem}
+.r-link{text-decoration:underline;cursor:pointer;font-weight:bold}
+.chron-item{padding:5px 0;border-bottom:1px dashed rgba(29,58,53,.18)}
+.chron-tag{display:inline-block;padding:1px 6px;border-radius:6px;background:rgba(211,154,47,.3);font-size:.75rem;margin-right:6px}
+#stageBadge{font-size:.74rem;padding:1px 6px;border-radius:6px;background:rgba(211,154,47,.35);border:1px solid rgba(138,95,18,.35);margin-left:6px;vertical-align:middle}
+#bRoster,#bChron,#bObs{padding:3px 8px;font-size:.78rem;background:transparent;border-radius:8px;cursor:pointer;border:1px solid rgba(29,58,53,.3)}
+#obsExit{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:none;padding:8px 14px;font-size:.86rem;z-index:30;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+body.obs #top,body.obs #zoom,body.obs #bar,body.obs #sub,body.obs #card,body.obs #eco,body.obs #roster,body.obs #chron,body.obs #resCard,body.obs #debug{display:none!important}
+body.obs #obsExit{display:flex;align-items:center;gap:6px}
 </style>
 </head>
 <body>
@@ -65,23 +79,27 @@ button,a{font:inherit;color:var(--ink)}
 <div id="top">
   <div class="row">
     <a class="pn b" id="backToBank" href="./index.html">← 題庫</a>
-    <div class="pn" id="hud"><b>山河築夢</b><span id="clk"></span></div>
+    <div class="pn" id="hud"><div><b>山河築夢</b><span id="stageBadge">荒野聚落</span></div><span id="clk"></span></div>
     <button class="pn b" id="bSpd" aria-label="遊戲速度">1×</button>
     <button class="pn b" id="bPause">暫停</button>
   </div>
   <div class="pn" id="stats">
     <span>居民 <b id="sPop">0</b></span><span>糧食 <b id="sFood">0</b></span><span>幸福 <b id="sHap">0</b>%</span><span>鎮庫 <b id="sM">0</b></span>
-    <button id="bEco">經濟</button><button id="bReset">重來</button>
+    <button id="bRoster">名冊</button><button id="bChron">史志</button><button id="bEco">經濟</button><button id="bReset">重來</button>
   </div>
 </div>
 <div id="zoom">
   <button class="pn b" id="zi" aria-label="放大">＋</button>
   <button class="pn b" id="zo" aria-label="縮小">－</button>
   <button class="pn b" id="zh" aria-label="回到小鎮">⌖</button>
+  <button class="pn b" id="bObs" aria-label="觀察模式" title="城鎮觀察模式">👁</button>
   <button class="pn b" id="zd" aria-label="除錯">D</button>
 </div>
+<button id="obsExit" class="pn">退出觀察模式</button>
 <div id="msg" class="pn"></div>
 <div id="eco" class="pn"><div class="eh"><b>經濟統計</b><button id="ecoX">關閉</button></div><div id="ecoBody"></div></div>
+<div id="roster" class="pn"><div class="eh"><b>全鎮人口名冊</b><div><select id="rosterFilter"><option value="all">全部居民</option><option value="unemployed">待業中</option><option value="employed">已就業</option><option value="child">未成年</option></select> <button id="rosterAutoJob">一鍵補缺</button> <button id="rosterX">關閉</button></div></div><div id="rosterBody"></div></div>
+<div id="chron" class="pn"><div class="eh"><b>城鎮編年史</b><button id="chronX">關閉</button></div><div id="chronBody"></div></div>
 <div id="resCard" class="pn"><div class="rh"><b id="resName">居民</b><button id="resX">關閉</button></div><div class="body" id="resBody"></div></div>
 <div id="debug" class="pn"></div>
 <div id="sub" class="pn"></div>
@@ -253,6 +271,54 @@ let ECO = { food: 0, hap: 50, pop: 0, jobs: 0, employed: 0, biz: 0, sat: {} }, S
 let hov = null, VW = 0, VH = 0, DPR = 1, introOpen = false, cardB = null, resCardR = null;
 let sel = { bridge: "b1", house: "h1", farm: "f1", shop: "s1", work: "w1", park: "p1" };
 let bridges = new Set();
+let townStage = 0; // 0: 荒野聚落, 1: 繁榮村落, 2: 商業城鎮, 3: 繁華都會
+let chronicle = []; // [{ day, tag, text }]
+let milestones = {}; // track one-time historical milestones
+let rosterOpen = false, chronOpen = false, obsMode = false;
+let obsAngle = 0, obsTarget = null, obsTimer = 0;
+const STAGES = [
+  { name: "荒野聚落", desc: "河畔初闢，炊煙初起" },
+  { name: "繁榮村落", desc: "人口達 8 人，且有農田與商鋪運作" },
+  { name: "商業城鎮", desc: "人口達 20 人，商業與作坊齊備、公庫充盈" },
+  { name: "繁華都會", desc: "人口達 45 人，百業興旺、幸福度 70% 以上" }
+];
+
+
+function addChronicle(tag, text, key) {
+  if (key) {
+    if (milestones[key]) return;
+    milestones[key] = 1;
+  }
+  const day = Math.floor(S.t / 360) + 1;
+  chronicle.push({ day, tag, text });
+  if (chronicle.length > 120) chronicle.shift();
+}
+
+function evalTownStage() {
+  const pop = residents.size;
+  let shops = 0, works = 0, farms = 0, parks = 0;
+  forEachB(b => {
+    if (b.p < 1 || !ok(b)) return;
+    const cat = TY[b.t].cat;
+    if (cat === "shop") shops++;
+    else if (cat === "work") works++;
+    else if (cat === "farm") farms++;
+    else if (cat === "park") parks++;
+  });
+  let nextStage = 0;
+  if (pop >= 45 && shops >= 4 && works >= 3 && parks >= 3 && ECO.hap >= 70 && S.m >= 2000) nextStage = 3;
+  else if (pop >= 20 && shops >= 2 && works >= 2 && S.m >= 800) nextStage = 2;
+  else if (pop >= 8 && (shops >= 1 || works >= 1) && farms >= 1) nextStage = 1;
+
+  if (nextStage > townStage) {
+    townStage = nextStage;
+    const st = STAGES[townStage];
+    addChronicle("晉升", "小鎮規模日盛，正式晉升為「" + st.name + "」！");
+    say("🎉 城鎮晉升為「" + st.name + "」！");
+  }
+  const badge = $("#stageBadge");
+  if (badge) badge.textContent = STAGES[townStage].name;
+}
 
 // ============================================================
 // 6. 居民系統
@@ -318,6 +384,10 @@ function populateHouse(b) {
   placeResidentAtHome(a, b, 0);
   placeResidentAtHome(bb, b, 1);
   b.workers = b.workers || [];
+  addChronicle("遷入", a.name + "與" + bb.name + "夫婦遷入河畔小鎮定居。", "first_resident");
+  if (residents.size >= 10) addChronicle("人口", "全鎮人口首度突破 10 人。", "pop_10");
+  if (residents.size >= 25) addChronicle("人口", "全鎮人口突破 25 人，街巷漸趨熱鬧。", "pop_25");
+  if (residents.size >= 50) addChronicle("人口", "全鎮人口突破 50 人，已成一方重鎮。", "pop_50");
   syncRp();
 }
 
@@ -384,6 +454,7 @@ function bgDay() {
         r.rel.children.push(child.id);
         const sp = residents.get(r.rel.spouse); if (sp) sp.rel.children.push(child.id);
         r.log.push("第" + (day + 1) + "日 孩子" + child.name + "出生");
+        addChronicle("新生", r.name + "家中喜添新丁「" + child.name + "」。", "first_birth");
       }
     }
     if (r.mood < 20 && !r.jobKey && Math.random() < .01) { leaveResident(r, "遷出"); }
@@ -430,6 +501,7 @@ function bgDay() {
       placeResidentAtHome(partner, b, 1);
       kid.log.push("第" + (day + 1) + "日 與" + partner.name + "成家分戶");
       partner.log.push("第" + (day + 1) + "日 與" + kid.name + "成家入住");
+      addChronicle("成家", kid.name + "與" + partner.name + "成親立戶，遷入新居。");
       return;
     }
     const attractProb = ECO.hap >= 55 ? .45 : ECO.hap >= 35 ? .25 : .12;
@@ -663,13 +735,14 @@ function save() {
     residents.forEach(r => rs.push([r.id, r.name, r.gender, r.age, r.born, r.familyId, r.houseKey, r.jobKey, r.skill, r.wallet, rd(r.needs), +r.mood.toFixed(1), r.rel.parent, r.rel.spouse, r.rel.children, r.log.slice(-20)]));
     const hhs = [];
     households.forEach(h => hhs.push([h.id, h.homeKey, h.members, +h.wallet.toFixed(1)]));
-    localStorage.setItem(KEY, JSON.stringify({ v: 5, ch, m: S.m, t: S.t, rp: +S.rp.toFixed(1), cam: { x: cam.x, y: cam.y, z: Z }, tool, sel, sp: speed, rs, hhs, nid: nextId, nhid: nextHouseId, bg: Array.from(bridges) }));
+    localStorage.setItem(KEY, JSON.stringify({ v: 5, ch, m: S.m, t: S.t, rp: +S.rp.toFixed(1), cam: { x: cam.x, y: cam.y, z: Z }, tool, sel, sp: speed, rs, hhs, nid: nextId, nhid: nextHouseId, bg: Array.from(bridges), stg: townStage, chr: chronicle, ms: milestones }));
   } catch (e) {}
 }
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY)); if (!d || d.v !== 5) return false;
     chunks.clear(); residents.clear(); households.clear(); activeResidents.clear(); bridges = new Set(d.bg || []);
+    townStage = d.stg || 0; chronicle = d.chr || []; milestones = d.ms || {};
     for (const k in d.ch) {
       const [cx, cy] = k.split(",").map(Number); const c = getChunk(cx, cy, true);
       d.ch[k].r.forEach(l => c.roads.add(l));
@@ -756,7 +829,7 @@ function migrateV2() {
     return true;
   } catch (e) { return false; }
 }
-function fresh() { chunks.clear(); residents.clear(); households.clear(); activeResidents.clear(); bridges = new Set(); S = { m: 2400, t: 120, rp: 0 }; addRoad(DOCK.x, DOCK.y); centerOn(DOCK.x - 2, DOCK.y + 2); }
+function fresh() { chunks.clear(); residents.clear(); households.clear(); activeResidents.clear(); bridges = new Set(); townStage = 0; chronicle = []; milestones = {}; S = { m: 2400, t: 120, rp: 0 }; addRoad(DOCK.x, DOCK.y); addChronicle("建鎮", "在景和王朝的河畔碼頭立下界碑，開啟築夢之旅。", "found_town"); centerOn(DOCK.x - 2, DOCK.y + 2); }
 function centerOn(x, y) { cam.x = (x - y) * HW; cam.y = (x + y) * HH; }
 function home() { let sx = 0, sy = 0, n = 0; forEachB(b => { sx += b.x; sy += b.y; n++; }); if (n) centerOn(sx / n, sy / n); else centerOn(DOCK.x - 2, DOCK.y + 2); clampCam(); dirty(); }
 
@@ -1062,12 +1135,21 @@ function tick() {
   const emp = pop > 0 ? Math.min(1, jobs / pop) : 1, pkv = Math.min(1, pk / Math.max(1, pop / 8));
   const hap = 100 * (.5 * sat.noodle + .2 * gs + .15 * emp + .15 * pkv);
   ECO = { food: SUP.noodle || 0, hap: pop > 0 ? ECO.hap * .7 + hap * .3 : 50, pop, jobs, employed, biz, sat };
+  evalTownStage();
 }
 function step(d) {
   S.t += d;
   forEachB(b => {
     const T = TY[b.t];
-    if (b.p < 1) b.p = Math.min(1, b.p + d / (T.bt || 18));
+    if (b.p < 1) {
+      b.p = Math.min(1, b.p + d / (T.bt || 18));
+      if (b.p >= 1) {
+        addChronicle("營建", "小鎮首座建築「" + T.n + "」正式落成。", "first_build");
+        if (T.cat === "shop") addChronicle("商業", "首間商鋪「" + T.n + "」開張營業。", "first_shop");
+        if (T.cat === "work") addChronicle("百工", "首座作坊「" + T.n + "」建成投產。", "first_work");
+        if (T.cat === "farm") addChronicle("農桑", "首片「" + T.n + "」開墾完成。", "first_farm");
+      }
+    }
     else if (T.cat === "house" && !b.hk) populateHouse(b);
   });
   acc += d; if (acc >= 10) { acc -= 10; tick(); }
@@ -1076,6 +1158,27 @@ function step(d) {
   }
   updateActiveSet();
   activeTick(d);
+  if (obsMode) {
+    obsTimer -= d;
+    if (!obsTarget || obsTimer <= 0) {
+      const candidates = [];
+      forEachB(b => { if (b.p >= 1) candidates.push([b.x, b.y]); });
+      activeResidents.forEach(id => { const r = residents.get(id); if (r) candidates.push([r.x, r.y]); });
+      if (candidates.length > 0) {
+        const pickPt = randOf(candidates);
+        obsTarget = { x: (pickPt[0] - pickPt[1]) * HW, y: (pickPt[0] + pickPt[1]) * HH };
+      } else {
+        obsTarget = { x: (DOCK.x - DOCK.y) * HW, y: (DOCK.x + DOCK.y) * HH };
+      }
+      obsTimer = 10 + Math.random() * 6;
+    }
+    obsAngle += d * 0.18;
+    const tx = obsTarget.x + Math.cos(obsAngle) * 65;
+    const ty = obsTarget.y + Math.sin(obsAngle) * 35;
+    cam.x += (tx - cam.x) * Math.min(1, d * 0.45);
+    cam.y += (ty - cam.y) * Math.min(1, d * 0.45);
+    clampCam();
+  }
   if (Math.floor(S.t / 360) !== Math.floor((S.t - d) / 360)) {
     collectDailyTax();
     bgDay();
@@ -1351,10 +1454,145 @@ function hud() {
   $("#sPop").textContent = residents.size; $("#sFood").textContent = Math.floor(ECO.food); $("#sHap").textContent = Math.round(ECO.hap); $("#sM").textContent = Math.floor(S.m);
   $("#clk").textContent = "第" + (Math.floor(S.t / 360) + 1) + "日 " + pad(hh) + ":" + pad(mm) + "・" + SH[Math.floor(((hh + 1) % 24) / 2)] + "時" + (dark(h) > .5 ? "・夜" : "");
   if (ecoOpen) renderEco();
+  if (chronOpen) renderChronicle();
   if (debugOpen) renderDebug();
   if (resCardR) { if (!residents.has(resCardR.id)) { $("#resCard").style.display = "none"; resCardR = null; } else showResident(resCardR); }
 }
-$("#bEco").onclick = () => { ecoOpen = true; $("#eco").style.display = "flex"; renderEco(); };
+
+function closeAllModals() {
+  ecoOpen = false; $("#eco").style.display = "none";
+  rosterOpen = false; $("#roster").style.display = "none";
+  chronOpen = false; $("#chron").style.display = "none";
+  resCardR = null; $("#resCard").style.display = "none";
+  hideCard();
+}
+
+function autoAssignJobs() {
+  const openBuildings = allBuildings().filter(b => b.p >= 1 && TY[b.t].jobs && ok(b) && (b.workers || []).length < (TY[b.t].jobs || 0));
+  if (!openBuildings.length) return say("目前沒有空缺的職位");
+  let assigned = 0;
+  const day = Math.floor(S.t / 360) + 1;
+  residents.forEach(r => {
+    if (r.age < 14 || r.jobKey) return;
+    const target = openBuildings.find(b => (b.workers || []).length < (TY[b.t].jobs || 0));
+    if (target) {
+      target.workers = target.workers || [];
+      target.workers.push(r.id);
+      r.jobKey = K(target.x, target.y);
+      r.log.push("第" + day + "日 奉派至" + TY[target.t].n + "工作");
+      assigned++;
+    }
+  });
+  if (assigned > 0) {
+    say("已為 " + assigned + " 位待業居民安排工作");
+    tick();
+    renderRoster();
+    dirty();
+  } else {
+    say("沒有可安排工作的待業居民");
+  }
+}
+
+function renderRoster() {
+  const filter = $("#rosterFilter").value;
+  const all = Array.from(residents.values());
+  const list = all.filter(r => {
+    if (filter === "unemployed") return r.age >= 14 && !r.jobKey;
+    if (filter === "employed") return !!r.jobKey;
+    if (filter === "child") return r.age < 14;
+    return true;
+  });
+  const jobsList = allBuildings().filter(b => b.p >= 1 && TY[b.t].jobs && ok(b));
+  const rows = list.map(r => {
+    const jb = r.jobKey ? bm.get(r.jobKey) : null;
+    const jobName = jb ? TY[jb.t].n : (r.age < 14 ? "幼童" : "待業");
+    const opts = ['<option value="">' + (r.age < 14 ? "未滿14歲" : "— 待業 —") + '</option>']
+      .concat(jobsList.map(b => {
+        const k = K(b.x, b.y);
+        const cur = (b.workers || []).length, cap = TY[b.t].jobs || 3;
+        const selected = r.jobKey === k ? " selected" : "";
+        const disabled = (!selected && cur >= cap) ? " disabled" : "";
+        return '<option value="' + k + '"' + selected + disabled + '>' + TY[b.t].n + ' (' + cur + '/' + cap + ')</option>';
+      })).join("");
+    const jobCell = r.age < 14 ? "幼童" : '<select class="r-job-sel" data-rid="' + r.id + '">' + opts + '</select>';
+    return '<tr><td><span class="r-link" data-rid="' + r.id + '">' + r.name + '</span></td><td>' + (r.gender === "f" ? "女" : "男") + '·' + r.age + '歲</td><td>' + jobCell + '</td><td>' + Math.floor(r.wallet || 0) + '文</td><td>' + Math.round(r.mood) + '%</td></tr>';
+  }).join("");
+  $("#rosterBody").innerHTML = '<p>總人口 <b>' + all.length + '</b> 人（已就業 ' + all.filter(r => r.jobKey).length + ' 人，待業 ' + all.filter(r => r.age >= 14 && !r.jobKey).length + ' 人）</p>' +
+    '<table><tr><th>姓名</th><th>性別年齡</th><th>職業指派</th><th>錢包</th><th>心情</th></tr>' + (rows || '<tr><td colspan="5">尚無符合條件的居民</td></tr>') + '</table>';
+}
+
+$("#rosterBody").addEventListener("click", e => {
+  const el = e.target.closest(".r-link");
+  if (!el) return;
+  const r = residents.get(Number(el.dataset.rid));
+  if (r) {
+    closeAllModals();
+    centerOn(r.x, r.y);
+    clampCam();
+    showResident(r);
+  }
+});
+
+$("#rosterBody").addEventListener("change", e => {
+  const selEl = e.target.closest(".r-job-sel");
+  if (!selEl) return;
+  const r = residents.get(Number(selEl.dataset.rid));
+  if (!r) return;
+  const newKey = selEl.value ? Number(selEl.value) : null;
+  if (r.jobKey != null) {
+    const oldB = bm.get(r.jobKey);
+    if (oldB && oldB.workers) {
+      const idx = oldB.workers.indexOf(r.id);
+      if (idx >= 0) oldB.workers.splice(idx, 1);
+    }
+  }
+  r.jobKey = null;
+  if (newKey != null) {
+    const newB = bm.get(newKey);
+    if (newB && (newB.workers || []).length < (TY[newB.t].jobs || 3)) {
+      newB.workers = newB.workers || [];
+      newB.workers.push(r.id);
+      r.jobKey = newKey;
+      r.log.push("第" + (Math.floor(S.t / 360) + 1) + "日 調任至" + TY[newB.t].n);
+    }
+  }
+  tick();
+  renderRoster();
+  dirty();
+});
+
+$("#rosterFilter").onchange = renderRoster;
+$("#rosterAutoJob").onclick = autoAssignJobs;
+$("#bRoster").onclick = () => { closeAllModals(); rosterOpen = true; $("#roster").style.display = "flex"; renderRoster(); };
+$("#rosterX").onclick = () => { rosterOpen = false; $("#roster").style.display = "none"; };
+
+function renderChronicle() {
+  const st = STAGES[townStage];
+  const nextSt = STAGES[townStage + 1];
+  const header = '<p>當前規模：<b>' + st.name + '</b>（' + st.desc + '）' +
+    (nextSt ? '<br><small>下一階段「' + nextSt.name + '」條件：' + nextSt.desc + '</small>' : '<br><small>已達最高繁華都會規模！</small>') + '</p>';
+  const items = chronicle.slice().reverse().map(c =>
+    '<div class="chron-item"><span class="chron-tag">' + c.tag + '</span><b>第 ' + c.day + ' 日</b>　' + c.text + '</div>'
+  ).join("");
+  $("#chronBody").innerHTML = header + (items || "<p>尚無歷史紀錄。</p>");
+}
+$("#bChron").onclick = () => { closeAllModals(); chronOpen = true; $("#chron").style.display = "flex"; renderChronicle(); };
+$("#chronX").onclick = () => { chronOpen = false; $("#chron").style.display = "none"; };
+
+function setObserverMode(on) {
+  obsMode = on;
+  document.body.classList.toggle("obs", on);
+  if (on) {
+    closeAllModals();
+    obsTarget = null;
+    obsTimer = 0;
+    say("進入城鎮觀察模式，靜賞河畔日夜煙火");
+  }
+}
+$("#bObs").onclick = () => setObserverMode(true);
+$("#obsExit").onclick = () => setObserverMode(false);
+
+$("#bEco").onclick = () => { closeAllModals(); ecoOpen = true; $("#eco").style.display = "flex"; renderEco(); };
 $("#ecoX").onclick = () => { ecoOpen = false; $("#eco").style.display = "none"; };
 
 // ============================================================
@@ -1377,7 +1615,7 @@ if (CR.length) {
     }
   });
 }
-updateActiveSet(); clampCam(); renderSub(); updBar();
+evalTownStage(); updateActiveSet(); clampCam(); renderSub(); updBar();
 if (!had) introOpen = true; else $("#intro").style.display = "none";
 $("#go").onclick = () => { introOpen = false; $("#intro").style.display = "none"; save(); };
 let last = 0;
