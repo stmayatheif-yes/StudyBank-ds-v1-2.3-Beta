@@ -249,7 +249,7 @@ const ok = b => TY[b.t].cat === "park" || roadAdj(b.x, b.y);
 const $ = s => document.querySelector(s);
 const cv = $("#cv"), cx = cv.getContext("2d");
 let S = { m: 2400, t: 120, rp: 0 }, speed = 1, paused = false, tool = "road", acc = 0, Z = 1, cam = { x: 0, y: 0 };
-let ECO = { food: 0, hap: 50, pop: 0, jobs: 0, biz: 0, sat: {} }, SUP = {}, SL = {}, TGT = {}, ecoOpen = false;
+let ECO = { food: 0, hap: 50, pop: 0, jobs: 0, employed: 0, biz: 0, sat: {} }, SUP = {}, SL = {}, TGT = {}, ecoOpen = false;
 let hov = null, VW = 0, VH = 0, DPR = 1, introOpen = false, cardB = null, resCardR = null;
 let sel = { bridge: "b1", house: "h1", farm: "f1", shop: "s1", work: "w1", park: "p1" };
 let bridges = new Set();
@@ -321,7 +321,7 @@ function populateHouse(b) {
   syncRp();
 }
 
-// 每日穩定稅收（戶稅＋營業稅＋田賦）
+// 每日穩定稅收（人頭稅＋營業稅＋田賦）
 function collectDailyTax() {
   let taxTotal = 0;
   forEachB(b => {
@@ -738,7 +738,7 @@ function showCard(b) {
   let t = T.n + "・" + (b.p < 1 ? "興建中 " + Math.floor(b.p * 100) + "%" : T.cat === "house" ? "住戶 " + ((households.get(b.hk) || { members: [] }).members.length) + "/4" : T.cat === "park" ? "景觀" : (b.st || "運作中")) + (ok(b) ? "" : "（沒有連到河岸的路）");
   if (b.p >= 1 && T.cat !== "house" && T.cat !== "park") {
     const li = o => Object.keys(o || {}).filter(g => o[g] >= 1).map(g => GD[g].n + " " + Math.floor(o[g])).join("、") || "無";
-    t += "\n營運資金 " + Math.floor(b.cash || 0) + " 景元・職缺 " + (b.workers || []).length + "/" + (T.jobs || 3) + "\n庫存：" + li(b.out) + (T.rec && Object.keys(T.rec.in).length ? "\n原料：" + li(b.in) : "");
+    t += "\n營運資金 " + Math.floor(b.cash || 0) + " 景元・員工 " + (b.workers || []).length + "/" + (T.jobs || 3) + "\n庫存：" + li(b.out) + (T.rec && Object.keys(T.rec.in).length ? "\n原料：" + li(b.in) : "");
   }
   $("#cardT").textContent = t; $("#cardDel").textContent = "移除（退還 " + b.c + " 文）"; $("#card").style.display = "flex";
 }
@@ -770,8 +770,8 @@ function showResident(r) {
     "職業：" + job + "\n" +
     "家庭：" + fam + "\n配偶：" + spouse + "\n" +
     "錢包：" + Math.floor(r.wallet) + " 景元\n" +
-    "心情：" + Math.round(r.mood) + "%　技能：" + Math.floor(r.skill) + "\n" +
-    "需求：飽食 " + Math.round(r.needs.hun) + "　體力 " + Math.round(r.needs.fat) + "　心情 " + Math.round(r.needs.joy) + "　社交 " + Math.round(r.needs.soc) + "\n" +
+    "心情：" + Math.round(r.mood) + "% 技能：" + Math.floor(r.skill) + "\n" +
+    "需求：飽食 " + Math.round(r.needs.hun) + " 體力 " + Math.round(r.needs.fat) + " 心情 " + Math.round(r.needs.joy) + " 社交 " + Math.round(r.needs.soc) + "\n" +
     "狀態：" + ({ idle: "閒置", move: "移動中", work: "上班", eat: "吃飯", sleep: "休息", social: "社交", walk: "散步" }[r.state] || r.state) + "\n\n" +
     "經歷：\n" + (r.log.length ? r.log.slice(-8).join("\n") : "（尚無）");
   $("#resCard").style.display = "flex";
@@ -965,8 +965,17 @@ function tick() {
   S.subsidyBudget = Math.max(0, S.m * 0.02);
   S.subsidyUsedGlobal = 0;
   const bl = []; forEachB(b => { if (b.p >= 1 && ok(b)) { ens(b); bl.push(b); } });
-  let pop = residents.size, jobs = 0, pk = 0, biz = 0;
-  bl.forEach(b => { const T = TY[b.t]; if (T.cat === "house") { if (b.p >= 1 && !b.hk) populateHouse(b); } else if (T.cat === "park") pk++; else { jobs += T.jobs || 3; biz += b.cash; } });
+  let pop = residents.size, jobs = 0, employed = 0, pk = 0, biz = 0;
+  bl.forEach(b => {
+    const T = TY[b.t];
+    if (T.cat === "house") { if (b.p >= 1 && !b.hk) populateHouse(b); }
+    else if (T.cat === "park") pk++;
+    else {
+      jobs += T.jobs || 3;
+      employed += (b.workers || []).length;
+      biz += b.cash;
+    }
+  });
   TGT = { wheat: 24, flour: 20 }; Object.keys(GD).forEach(g => { if (GD[g].need) TGT[g] = Math.max(10, pop * GD[g].need * .6); });
   scan(bl);
   bl.forEach(b => { const T = TY[b.t]; if (T.rec) produce(b, T); });
@@ -1023,7 +1032,7 @@ function tick() {
   const gl = ["pottery", "wood", "cloth", "iron", "wine"], gs = (gl.reduce((a, g) => a + sat[g], 0) + ss) / (gl.length + 1);
   const emp = pop > 0 ? Math.min(1, jobs / pop) : 1, pkv = Math.min(1, pk / Math.max(1, pop / 8));
   const hap = 100 * (.5 * sat.noodle + .2 * gs + .15 * emp + .15 * pkv);
-  ECO = { food: SUP.noodle || 0, hap: pop > 0 ? ECO.hap * .7 + hap * .3 : 50, pop, jobs, biz, sat };
+  ECO = { food: SUP.noodle || 0, hap: pop > 0 ? ECO.hap * .7 + hap * .3 : 50, pop, jobs, employed, biz, sat };
 }
 function step(d) {
   S.t += d;
@@ -1303,8 +1312,8 @@ $("#zh").onclick = home;
 $("#bReset").onclick = () => { if (confirm("要清除目前的小鎮，重新開始嗎？")) { try { for (const k of ["town_save_v5", "town_save_v4", "town_save_v3", "town_save_v2", "town_save_v1"]) localStorage.removeItem(k); } catch (e) {} location.reload(); } };
 function renderEco() {
   const rows = Object.keys(GD).map(g => { const T = GD[g]; return "<tr><td>" + T.n + "</td><td>" + Math.floor(SUP[g] || 0) + "</td><td>" + (mp(g) * 1.35).toFixed(1) + "</td><td>" + (T.need ? Math.round((ECO.sat[g] == null ? 1 : ECO.sat[g]) * 100) + "%" : "—") + "</td></tr>"; }).join("");
-  $("#ecoBody").innerHTML = "<p>公庫 <b>" + Math.floor(S.m) + "</b>　居民財產 <b>" + Math.floor(S.rp) + "</b>　商業資金 <b>" + Math.floor(ECO.biz) + "</b>（景元）</p>" +
-    "<p>人口 " + residents.size + "（視野內 " + activeResidents.size + "）　職缺 " + ECO.jobs + "　建築 " + countB() + "　幸福度 " + Math.round(ECO.hap) + "%</p>" +
+  $("#ecoBody").innerHTML = "<p>公庫 <b>" + Math.floor(S.m) + "</b> 居民財產 <b>" + Math.floor(S.rp) + "</b> 商業資金 <b>" + Math.floor(ECO.biz) + "</b>（景元）</p>" +
+    "<p>人口 " + residents.size + "（視野內 " + activeResidents.size + "） 就業 " + (ECO.employed || 0) + "/" + ECO.jobs + " 建築 " + countB() + " 幸福度 " + Math.round(ECO.hap) + "%</p>" +
     "<table><tr><th>商品</th><th>庫存</th><th>零售價</th><th>需求滿足</th></tr>" + rows + "</table>" +
     '<p class="nt">居民現在會保留基本儲蓄，有工作的居民每天領取穩定薪資；商鋪會保留隔夜安全糧食，鎮庫每日依人口、商鋪與農田徵收稅收，商船停靠碼頭亦會繳納關稅。</p>';
 }
