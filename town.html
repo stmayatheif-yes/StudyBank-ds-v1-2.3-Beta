@@ -486,17 +486,28 @@ function viewBounds() {
 }
 function worldToScreen(x, y) { return [(x - y) * HW, (x + y) * HH]; }
 function updateActiveSet() {
-  const vb = viewBounds();
-  // 視野四角的世界座標（等距 → 世界）
-  const corners = [
-    [(vb.x0 / HW + vb.y0 / HH) / 2, (vb.y0 / HH - vb.x0 / HW) / 2],
-    [(vb.x1 / HW + vb.y0 / HH) / 2, (vb.y0 / HH - vb.x1 / HW) / 2],
-    [(vb.x0 / HW + vb.y1 / HH) / 2, (vb.y1 / HH - vb.x0 / HW) / 2],
-    [(vb.x1 / HW + vb.y1 / HH) / 2, (vb.y1 / HH - vb.x1 / HW) / 2]
+  // cam.x / cam.y 是等距平面座標（單位：畫布像素）
+  // 視野四角在等距平面上的位置：
+  const hw = VW / 2 / Z, hh = VH / 2 / Z;
+  const ex0 = cam.x - hw, ex1 = cam.x + hw;
+  const ey0 = cam.y - hh, ey1 = cam.y + hh;
+  // 等距平面 (ex, ey) → 世界格 (x, y)：
+  //   ex = (x - y) * HW
+  //   ey = (x + y) * HH
+  //   → x = (ex/HW + ey/HH) / 2
+  //   → y = (ey/HH - ex/HW) / 2
+  const toWorld = (ex, ey) => [
+    (ex / HW + ey / HH) / 2,
+    (ey / HH - ex / HW) / 2
   ];
-  const xs = corners.map(c => c[0]), ys = corners.map(c => c[1]);
-  const wx0 = Math.min(...xs) - 2, wx1 = Math.max(...xs) + 2;
-  const wy0 = Math.min(...ys) - 2, wy1 = Math.max(...ys) + 2;
+  const cs = [
+    toWorld(ex0, ey0), toWorld(ex1, ey0),
+    toWorld(ex0, ey1), toWorld(ex1, ey1)
+  ];
+  const xs = cs.map(c => c[0]), ys = cs.map(c => c[1]);
+  // 加 3 格緩衝，避免邊界居民反覆進出
+  const wx0 = Math.min(...xs) - 3, wx1 = Math.max(...xs) + 3;
+  const wy0 = Math.min(...ys) - 3, wy1 = Math.max(...ys) + 3;
   const next = new Set();
   residents.forEach(r => {
     if (r.x >= wx0 && r.x <= wx1 && r.y >= wy0 && r.y <= wy1) next.add(r.id);
