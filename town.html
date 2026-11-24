@@ -20,11 +20,19 @@ button,a{font:inherit;color:var(--ink)}
 #clk{font-size:.78rem;opacity:.8}
 #stats{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 12px;font-size:.82rem}
 #stats b{font-size:1rem}
-#bReset{padding:3px 9px;font-size:.78rem;background:transparent;border-radius:8px;cursor:pointer;border:1px solid rgba(29,58,53,.3)}
+#bReset,#bEco{padding:3px 9px;font-size:.78rem;background:transparent;border-radius:8px;cursor:pointer;border:1px solid rgba(29,58,53,.3)}
 #zoom{position:fixed;right:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px}
 #zoom .b{justify-content:center;width:40px;height:40px;font-size:1.1rem}
 #msg{position:fixed;left:50%;bottom:calc(142px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:8px 14px;font-size:.88rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
 #msg.show{opacity:1}
+#eco{position:fixed;left:8px;right:8px;top:calc(104px + env(safe-area-inset-top,0px));bottom:calc(8px + env(safe-area-inset-bottom,0px));display:none;flex-direction:column;padding:12px;overflow:hidden;z-index:5}
+#eco .eh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+#eco button{padding:5px 12px;border-radius:8px;border:1px solid rgba(29,58,53,.3);background:transparent;cursor:pointer}
+#ecoBody{overflow:auto;font-size:.88rem;line-height:1.7}
+#ecoBody table{width:100%;border-collapse:collapse;margin:6px 0}
+#ecoBody th,#ecoBody td{text-align:left;padding:3px 4px;border-bottom:1px solid rgba(29,58,53,.15)}
+#ecoBody .nt{opacity:.8;font-size:.82rem}
+#cardT{white-space:pre-line}
 #sub{position:fixed;left:8px;right:8px;bottom:calc(76px + env(safe-area-inset-bottom,0px));display:none;gap:6px;padding:6px;overflow-x:auto}
 .ch{flex:0 0 auto;background:transparent;border:1px solid rgba(29,58,53,.25);border-radius:9px;padding:5px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center}
 .ch small{font-size:.7rem;opacity:.75}
@@ -55,19 +63,20 @@ button,a{font:inherit;color:var(--ink)}
     <button class="pn b" id="bPause">暫停</button>
   </div>
   <div class="pn" id="stats">
-    <span>居民 <b id="sPop">0</b></span><span>建築 <b id="sB">0</b></span><span>街道 <b id="sR">0</b></span><span>鎮庫 <b id="sM">0</b> 文</span>
-    <button id="bReset">重來</button>
+    <span>居民 <b id="sPop">0</b></span><span>糧食 <b id="sFood">0</b></span><span>幸福 <b id="sHap">0</b>%</span><span>鎮庫 <b id="sM">0</b></span>
+    <button id="bEco">經濟</button><button id="bReset">重來</button>
   </div>
 </div>
 <div id="zoom"><button class="pn b" id="zi" aria-label="放大">＋</button><button class="pn b" id="zo" aria-label="縮小">－</button><button class="pn b" id="zh" aria-label="回到小鎮">⌖</button></div>
 <div id="msg" class="pn"></div>
+<div id="eco" class="pn"><div class="eh"><b>經濟統計</b><button id="ecoX">關閉</button></div><div id="ecoBody"></div></div>
 <div id="sub" class="pn"></div>
 <div id="card" class="pn"><div id="cardT"></div><div class="rw"><button id="cardDel"></button><button id="cardX">關閉</button></div></div>
 <div id="bar" class="pn"></div>
 <div id="intro"><div class="pn">
   <h2>河畔小鎮</h2>
   <p>在河岸邊，一格一格把小鎮鋪起來。</p>
-  <ol><li>選「鋪路」，從河岸邊的碼頭拖出一條青石路。</li><li>選「民居」，點在路旁的空地，等它落成。</li><li>居民搬進來後，再蓋商鋪和作坊，賺取鎮庫。</li></ol>
+  <ol><li>選「鋪路」，從河岸邊的碼頭拖出一條青石路。</li><li>選「民居」，點在路旁的空地，等它落成。</li><li>居民搬進來後，蓋「麥田→磨坊→麵食店」讓他們有飯吃，其他作坊要有商鋪來收貨。</li></ol>
   <p>單指拖曳移動畫面（鋪路和拆除時改用兩指），兩指縮放。世界很大，右側的 ⌖ 可以隨時回到你的小鎮。進度會自動存在這支手機上。</p>
   <button id="go">開始建造</button>
 </div></div>
@@ -77,22 +86,31 @@ button,a{font:inherit;color:var(--ink)}
 "use strict";
 const N = 10000, RX = 5004, HW = 32, HH = 16, DOCK = { x: 5003, y: 5000 }, KEY = "town_save_v2", ROAD = 20;
 const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const GD = {
+  wheat: { n: "小麥", p: 2 }, flour: { n: "麵粉", p: 4 }, noodle: { n: "麵食", p: 6, need: 3 },
+  pottery: { n: "陶器", p: 10, need: .6 }, wood: { n: "木器", p: 12, need: .6 }, cloth: { n: "布匹", p: 11, need: .5 },
+  iron: { n: "鐵器", p: 15, need: .2 }, wine: { n: "酒", p: 13, need: .8 }
+};
 const CAT = {
   house: [{ id: "h1", n: "民居", c: 80, h: 20, r: 13, w: ["#ece1c8", "#cdc0a1"], f: ["#7a928d", "#566b68", "#8aa39e"] }],
+  bridge: [{ id: "b1", n: "大橋", c: 80 }, { id: "b2", n: "小橋", c: 40 }],
+  farm: [{ id: "f1", n: "麥田", c: 100, jobs: 2, bt: 12, rec: { in: {}, out: { wheat: 4 } } }],
   shop: [
-    { id: "s1", n: "雜貨鋪", c: 120, h: 24, r: 14, w: ["#dbb88f", "#b99671"], f: ["#d1604a", "#a23f2b", "#e07a63"], d: "lan", inc: 6 },
-    { id: "s2", n: "茶坊", c: 140, h: 24, r: 14, w: ["#d9c9a0", "#b8a77d"], f: ["#4f7b6b", "#3a5c50", "#62917f"], d: "flag", inc: 7 },
-    { id: "s3", n: "食肆", c: 160, h: 26, r: 14, w: ["#e4c9a4", "#c2a681"], f: ["#a8553a", "#85402b", "#bd6b4f"], d: "lan", inc: 8 },
-    { id: "s4", n: "布莊", c: 150, h: 24, r: 13, w: ["#e8dcc8", "#c9bb9f"], f: ["#3e5f8a", "#2f4a6c", "#5276a3"], d: "cloth", inc: 8 },
-    { id: "s5", n: "藥鋪", c: 170, h: 24, r: 14, w: ["#d8cdb3", "#b7ab8f"], f: ["#6a7f4f", "#52643c", "#7f9663"], d: "sign", inc: 9 },
-    { id: "s6", n: "酒樓", c: 260, h: 38, r: 16, w: ["#e2b58c", "#bf9168"], f: ["#b8452e", "#8f3320", "#cf5c43"], d: "lan2", inc: 15, bt: 30 }
+    { id: "s1", n: "雜貨鋪", c: 120, h: 24, r: 14, w: ["#dbb88f", "#b99671"], f: ["#d1604a", "#a23f2b", "#e07a63"], d: "lan", jobs: 3, sell: ["pottery", "wood", "iron"] },
+    { id: "s2", n: "茶坊", c: 140, h: 24, r: 14, w: ["#d9c9a0", "#b8a77d"], f: ["#4f7b6b", "#3a5c50", "#62917f"], d: "flag", jobs: 3, svc: 1 },
+    { id: "s3", n: "食肆", c: 160, h: 26, r: 14, w: ["#e4c9a4", "#c2a681"], f: ["#a8553a", "#85402b", "#bd6b4f"], d: "lan", jobs: 3, svc: 1 },
+    { id: "s4", n: "布莊", c: 150, h: 24, r: 13, w: ["#e8dcc8", "#c9bb9f"], f: ["#3e5f8a", "#2f4a6c", "#5276a3"], d: "cloth", jobs: 3, sell: ["cloth"] },
+    { id: "s5", n: "藥鋪", c: 170, h: 24, r: 14, w: ["#d8cdb3", "#b7ab8f"], f: ["#6a7f4f", "#52643c", "#7f9663"], d: "sign", jobs: 3, svc: 1 },
+    { id: "s6", n: "酒樓", c: 260, h: 38, r: 16, w: ["#e2b58c", "#bf9168"], f: ["#b8452e", "#8f3320", "#cf5c43"], d: "lan2", jobs: 4, bt: 30, sell: ["wine"] },
+    { id: "s7", n: "麵食店", c: 170, h: 24, r: 14, w: ["#e6d3ae", "#c4b088"], f: ["#b0733a", "#8a5a2c", "#c98a4e"], d: "lan", jobs: 3, sell: ["noodle"], rec: { in: { flour: 4 }, out: { noodle: 8 } } }
   ],
   work: [
-    { id: "w1", n: "陶坊", c: 150, h: 22, r: 11, w: ["#bf9f7e", "#9c7f61"], f: ["#8a6650", "#684a38", "#9c7863"], d: "kiln", inc: 9 },
-    { id: "w2", n: "木作坊", c: 150, h: 22, r: 11, w: ["#c9ad82", "#a68b63"], f: ["#6f5a3f", "#54432e", "#836c4e"], d: "logs", inc: 9 },
-    { id: "w3", n: "織坊", c: 170, h: 22, r: 12, w: ["#e0d2b6", "#bfb094"], f: ["#8a5f7a", "#6c4960", "#a0768f"], d: "yarn", inc: 11 },
-    { id: "w4", n: "鐵鋪", c: 200, h: 22, r: 11, w: ["#a9a49a", "#878279"], f: ["#5b5f66", "#44474d", "#6e737b"], d: "anvil", inc: 14 },
-    { id: "w5", n: "釀酒坊", c: 220, h: 24, r: 12, w: ["#d3b891", "#b09670"], f: ["#7b5b3e", "#5e432d", "#8f6e4f"], d: "jars", inc: 16 }
+    { id: "w1", n: "陶坊", c: 150, h: 22, r: 11, w: ["#bf9f7e", "#9c7f61"], f: ["#8a6650", "#684a38", "#9c7863"], d: "kiln", jobs: 3, rec: { in: {}, out: { pottery: 2 } } },
+    { id: "w2", n: "木作坊", c: 150, h: 22, r: 11, w: ["#c9ad82", "#a68b63"], f: ["#6f5a3f", "#54432e", "#836c4e"], d: "logs", jobs: 3, rec: { in: {}, out: { wood: 2 } } },
+    { id: "w3", n: "織坊", c: 170, h: 22, r: 12, w: ["#e0d2b6", "#bfb094"], f: ["#8a5f7a", "#6c4960", "#a0768f"], d: "yarn", jobs: 3, rec: { in: {}, out: { cloth: 2 } } },
+    { id: "w4", n: "鐵鋪", c: 200, h: 22, r: 11, w: ["#a9a49a", "#878279"], f: ["#5b5f66", "#44474d", "#6e737b"], d: "anvil", jobs: 3, rec: { in: {}, out: { iron: 1 } } },
+    { id: "w5", n: "釀酒坊", c: 220, h: 24, r: 12, w: ["#d3b891", "#b09670"], f: ["#7b5b3e", "#5e432d", "#8f6e4f"], d: "jars", jobs: 3, rec: { in: { wheat: 2 }, out: { wine: 2 } } },
+    { id: "w6", n: "磨坊", c: 180, h: 26, r: 12, w: ["#cfc2a6", "#aea286"], f: ["#6a6a5a", "#4f4f43", "#80806f"], d: "mill", jobs: 3, rec: { in: { wheat: 4 }, out: { flour: 4 } } }
   ],
   park: [
     { id: "p1", n: "垂柳", c: 60, k: "willow", bt: 6 }, { id: "p2", n: "花圃", c: 50, k: "flower", bt: 6 },
@@ -101,12 +119,14 @@ const CAT = {
   ]
 };
 const TY = {}; Object.keys(CAT).forEach(c => CAT[c].forEach(v => { v.cat = c; TY[v.id] = v; }));
-const TOOLS = [["look", "探索"], ["road", "鋪路"], ["house", "民居"], ["shop", "商鋪"], ["work", "作坊"], ["park", "園景"], ["del", "拆除"]];
+const TOOLS = [["look", "探索"], ["road", "鋪路"], ["bridge", "橋樑"], ["house", "民居"], ["farm", "農田"], ["shop", "商鋪"], ["work", "作坊"], ["park", "園景"], ["del", "拆除"]];
 const $ = s => document.querySelector(s);
 const cv = $("#cv"), cx = cv.getContext("2d");
 let roads = new Set(), bm = new Map(), conn = new Set(), CR = [], R = [];
-let S = { m: 2400, t: 120 }, speed = 1, paused = false, tool = "road", acc = 0, Z = 1, cam = { x: 0, y: 0 };
-let sel = { house: "h1", shop: "s1", work: "w1", park: "p1" };
+let S = { m: 2400, t: 120, rp: 0 }, speed = 1, paused = false, tool = "road", acc = 0, Z = 1, cam = { x: 0, y: 0 };
+let bridges = new Set();
+let sel = { bridge: "b1", house: "h1", farm: "f1", shop: "s1", work: "w1", park: "p1" };
+let ECO = { food: 0, hap: 50, pop: 0, jobs: 0, biz: 0, sat: {} }, SUP = {}, SL = {}, TGT = {}, ecoOpen = false;
 let hov = null, VW = 0, VH = 0, DPR = 1, introOpen = false, cardB = null;
 
 const K = (x, y) => y * N + x;
@@ -123,15 +143,16 @@ for (let i = 0; i < 8; i++) WC.push("hsl(197 42% " + (47 + i * .9) + "%)");
 
 // ===== 存檔（只存道路與建築，世界其他部分由程式生成） =====
 let sv = 0; const dirty = () => { clearTimeout(sv); sv = setTimeout(save, 400); };
+const rd = o => { const r = {}; for (const k in (o || {})) r[k] = +o[k].toFixed(2); return r; };
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify({ v: 2, rd: Array.from(roads), b: Array.from(bm.values()).map(b => [b.t, b.x, b.y, +b.p.toFixed(3), b.r, b.c]), m: S.m, t: S.t, cam: { x: cam.x, y: cam.y, z: Z }, tool: tool, sel: sel, sp: speed })); } catch (e) {}
+  try { localStorage.setItem(KEY, JSON.stringify({ v: 2, rd: Array.from(roads), bg: Array.from(bridges), b: Array.from(bm.values()).map(b => [b.t, b.x, b.y, +b.p.toFixed(3), b.r, b.c, { cash: +(b.cash || 0).toFixed(1), in: rd(b.in), out: rd(b.out), prog: b.prog || 0, br: b.br || 0 }]), m: S.m, t: S.t, rp: +S.rp.toFixed(1), cam: { x: cam.x, y: cam.y, z: Z }, tool: tool, sel: sel, sp: speed })); } catch (e) {}
 }
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY)); if (!d || d.v !== 2) return false;
-    roads = new Set(d.rd); bm = new Map();
-    d.b.forEach(a => { if (TY[a[0]]) bm.set(K(a[1], a[2]), { t: a[0], x: a[1], y: a[2], p: a[3], r: a[4], c: a[5] }); });
-    S = { m: d.m, t: d.t }; if (d.cam) { cam.x = d.cam.x; cam.y = d.cam.y; Z = d.cam.z || Z; }
+    roads = new Set(d.rd); bridges = new Set(d.bg || []); bm = new Map();
+    d.b.forEach(a => { if (TY[a[0]]) bm.set(K(a[1], a[2]), Object.assign({ t: a[0], x: a[1], y: a[2], p: a[3], r: a[4], c: a[5] }, a[6] || {})); });
+    S = { m: d.m, t: d.t, rp: d.rp || 0 }; if (d.cam) { cam.x = d.cam.x; cam.y = d.cam.y; Z = d.cam.z || Z; }
     if (d.sel) sel = Object.assign(sel, d.sel); if (d.tool) tool = d.tool; if (d.sp) { speed = d.sp; $("#bSpd").textContent = speed + "×"; }
     return true;
   } catch (e) { return false; }
@@ -143,10 +164,10 @@ function migrate() {   // 把舊版 16×16 小鎮搬進新世界
     roads = new Set(); bm = new Map();
     for (let i = 0; i < 256; i++) if (d.g[i] === "2") roads.add(K(i % 16 + ox, ((i / 16) | 0) + oy));
     d.b.forEach(b => { const m = MT[b.t]; if (m) bm.set(K(b.x + ox, b.y + oy), { t: m[0], x: b.x + ox, y: b.y + oy, p: b.p, r: b.r || 0, c: m[1] }); });
-    S = { m: d.m, t: d.t }; return true;
+    S = { m: d.m, t: d.t, rp: 0 }; return true;
   } catch (e) { return false; }
 }
-function fresh() { roads = new Set([K(DOCK.x, DOCK.y)]); bm = new Map(); S = { m: 2400, t: 120 }; centerOn(DOCK.x - 2, DOCK.y + 2); }
+function fresh() { roads = new Set([K(DOCK.x, DOCK.y)]); bm = new Map(); S = { m: 2400, t: 120, rp: 0 }; centerOn(DOCK.x - 2, DOCK.y + 2); }
 function centerOn(x, y) { cam.x = (x - y) * HW; cam.y = (x + y) * HH; }
 function home() {
   let sx = 0, sy = 0, n = 0; bm.forEach(b => { sx += b.x; sy += b.y; n++; });
@@ -156,7 +177,7 @@ function home() {
 // ===== 道路連通：只有接到河岸的路才算通 =====
 function calcConn() {
   conn = new Set(); CR = []; const q = [];
-  roads.forEach(k => { const x = k % N, y = (k / N) | 0; if (D4.some(d => isW(x + d[0], y + d[1]))) { conn.add(k); q.push(k); } });
+  roads.forEach(k => { const x = k % N, y = (k / N) | 0; if (x === RX - 1) { conn.add(k); q.push(k); } });
   while (q.length) {
     const k = q.pop(), x = k % N, y = (k / N) | 0; CR.push(k);
     for (const d of D4) { const a = x + d[0], b = y + d[1]; if (!inW(a, b)) continue; const j = K(a, b); if (roads.has(j) && !conn.has(j)) { conn.add(j); q.push(j); } }
@@ -170,13 +191,18 @@ let mt;
 function say(m) { const e = $("#msg"); e.textContent = m; e.classList.add("show"); clearTimeout(mt); mt = setTimeout(() => e.classList.remove("show"), 2600); }
 function showCard(b) {
   cardB = b; const T = TY[b.t];
-  const st = b.p < 1 ? "興建中 " + Math.floor(b.p * 100) + "%" : T.cat === "house" ? "住戶 " + b.r + "/4" : T.cat === "park" ? "景觀" : "運作中";
-  $("#cardT").textContent = T.n + "・" + st + (ok(b) ? "" : "（沒有連到河岸的路）");
-  $("#cardDel").textContent = "移除（退還 " + b.c + " 文）"; $("#card").style.display = "flex";
+  let t = T.n + "・" + (b.p < 1 ? "興建中 " + Math.floor(b.p * 100) + "%" : T.cat === "house" ? "住戶 " + b.r + "/4" : T.cat === "park" ? "景觀" : (b.st || "運作中")) + (ok(b) ? "" : "（沒有連到河岸的路）");
+  if (b.p >= 1 && T.cat !== "house" && T.cat !== "park") {
+    const li = o => Object.keys(o || {}).filter(g => o[g] >= 1).map(g => GD[g].n + " " + Math.floor(o[g])).join("、") || "無";
+    t += "\n營運資金 " + Math.floor(b.cash || 0) + " 景元・職缺 " + (T.jobs || 3) + "\n庫存：" + li(b.out) + (T.rec && Object.keys(T.rec.in).length ? "\n原料：" + li(b.in) : "");
+  }
+  $("#cardT").textContent = t; $("#cardDel").textContent = "移除（退還 " + b.c + " 文）"; $("#card").style.display = "flex";
 }
 function hideCard() { cardB = null; $("#card").style.display = "none"; }
 function removeB(b) {
-  S.m += b.c; bm.delete(K(b.x, b.y)); syncRes(); hideCard(); say("已移除 " + TY[b.t].n + "，退還 " + b.c + " 文"); dirty();
+  const k = K(b.x, b.y), T = TY[b.t], back = b.c + (b.br ? 40 : 0);
+  S.m += back; bm.delete(k); if (T.k === "pavilion" || b.br) { roads.delete(k); calcConn(); }
+  syncRes(); hideCard(); say("已移除 " + T.n + "，退還 " + back + " 文"); dirty();
 }
 $("#cardDel").onclick = () => { if (cardB) removeB(cardB); };
 $("#cardX").onclick = hideCard;
@@ -186,23 +212,33 @@ const curT = () => tool === "road" ? { c: ROAD, cat: "road" } : TY[sel[tool]];
 function act(x, y) {
   if (!inW(x, y)) return;
   const k = K(x, y), b = bm.get(k);
-  if (tool === "look") { if (b) showCard(b); else { hideCard(); say(isW(x, y) ? "河水" : roads.has(k) ? (conn.has(k) ? "青石路" : "青石路（還沒接到河岸）") : "空地"); } return; }
+  if (tool === "look") { if (b) showCard(b); else { hideCard(); say(bridges.has(k) ? "大橋" : isW(x, y) ? "河水" : roads.has(k) ? (conn.has(k) ? "青石路" : "青石路（還沒接到河岸）") : "空地"); } return; }
   if (tool === "del") {
-    if (b) removeB(b);
-    else if (roads.has(k)) { roads.delete(k); S.m += ROAD; calcConn(); syncRes(); dirty(); }
+    if (b && b.br) { b.br = 0; roads.delete(k); S.m += 40; calcConn(); syncRes(); say("已拆除小橋，退還 40 文"); dirty(); }
+    else if (b) removeB(b);
+    else if (roads.has(k)) { const bg = bridges.has(k); roads.delete(k); bridges.delete(k); S.m += bg ? 80 : ROAD; calcConn(); syncRes(); dirty(); }
     else say("這裡沒有可以拆的東西");
     return;
+  }
+  if (tool === "bridge") {
+    const T = curT(); if (S.m < T.c) return say("鎮庫不足，需要 " + T.c + " 文");
+    if (T.id === "b1") { if (!isW(x, y)) return say("大橋要蓋在河面上（跨河要連蓋兩格）"); if (roads.has(k)) return; roads.add(k); bridges.add(k); S.m -= T.c; calcConn(); dirty(); return; }
+    if (!b || TY[b.t].k !== "pond") return say("小橋要蓋在池塘上");
+    if (b.p < 1) return say("池塘還在興建"); if (b.br) return say("這座池塘已經有橋了");
+    b.br = 1; roads.add(k); S.m -= T.c; calcConn(); dirty(); return;
   }
   if (isW(x, y)) return say("河面上不能蓋");
   if (roads.has(k) || b) return say("這格已經有東西了");
   const T = curT(); if (S.m < T.c) return say("鎮庫不足，需要 " + T.c + " 文");
   if (tool === "road") { roads.add(k); S.m -= ROAD; calcConn(); dirty(); return; }
-  if (T.cat !== "park" && !roadAdj(x, y)) return say("旁邊沒有路：要先把路接到河岸");
-  S.m -= T.c; bm.set(k, { t: T.id, x: x, y: y, p: 0, r: 0, c: T.c }); dirty();
+  if (T.cat !== "park" && !roadAdj(x, y)) return say(D4.some(d => roads.has(K(x + d[0], y + d[1]))) ? "旁邊的路還沒接到河岸（河東要先蓋大橋）" : "旁邊沒有路：要先把路接到河岸");
+  S.m -= T.c; if (ECO.pop > 0) S.rp += T.c * .4; bm.set(k, { t: T.id, x: x, y: y, p: 0, r: 0, c: T.c, cash: Math.round(T.c * .3), in: {}, out: {}, prog: 0 });
+  if (T.k === "pavilion") { roads.add(k); calcConn(); } dirty();
 }
 function can(x, y) {
   const k = K(x, y);
   if (tool === "del") return bm.has(k) || roads.has(k);
+  if (tool === "bridge") { const T = curT(), b = bm.get(k); if (S.m < T.c) return false; return T.id === "b1" ? isW(x, y) && !roads.has(k) : !!b && TY[b.t].k === "pond" && b.p >= 1 && !b.br; }
   if (isW(x, y) || roads.has(k) || bm.has(k)) return false;
   const T = curT(); if (S.m < T.c) return false;
   return tool === "road" || T.cat === "park" || roadAdj(x, y);
@@ -222,7 +258,7 @@ function updBar() {
 }
 function pick(k) {
   tool = k; hideCard(); renderSub(); updBar();
-  say({ look: "拖曳移動畫面，點建築可以查看或移除", road: "拖曳鋪路（兩指移動畫面）", del: "點擊或拖曳拆除，退還建造費用", park: "園景可蓋在任何空地，不用靠路" }[k] || "點擊空地建造，要蓋在路旁");
+  say({ look: "拖曳移動畫面，點建築可以查看或移除", road: "拖曳鋪路（兩指移動畫面）", bridge: "大橋蓋在河面（跨河要連蓋兩格），小橋點在池塘上", del: "點擊或拖曳拆除，退還建造費用", park: "園景可蓋在任何空地，不用靠路" }[k] || "點擊空地建造，要蓋在路旁");
   dirty();
 }
 TOOLS.forEach(t => {
@@ -248,21 +284,69 @@ function moveRes(d) {
     const nx = c[Math.random() * c.length | 0]; r.px = r.tx; r.py = r.ty; r.tx = nx[0]; r.ty = nx[1];
   });
 }
+const ens = b => { if (!b.out) b.out = {}; if (!b.in) b.in = {}; if (b.cash == null) b.cash = Math.round(b.c * .3); };
+function mp(g) { const T = GD[g], s = SUP[g] || 0, tg = TGT[g] || 12; return Math.max(.5 * T.p, Math.min(2 * T.p, T.p * (1.8 - .8 * s / tg))); }
+function income(s, pay, rate) { const tax = pay * rate, wage = pay * .3; s.cash += pay - tax - wage; S.m += tax; S.rp += wage; }
+function scan(bl) {
+  SUP = {}; SL = {};
+  bl.forEach(b => { for (const g in b.out) if (b.out[g] > 0) { SUP[g] = (SUP[g] || 0) + b.out[g]; if (TY[b.t].cat !== "shop") (SL[g] = SL[g] || []).push(b); } });
+}
+function buy(b, g, qty, dst) {
+  const pr = mp(g); qty = Math.min(qty, Math.floor(b.cash / pr)); if (qty <= 0) return;
+  let got = 0;
+  for (const s of (SL[g] || [])) {
+    if (s === b) continue; const t = Math.min(qty - got, Math.floor(s.out[g] || 0)); if (t <= 0) continue;
+    s.out[g] -= t; b.cash -= t * pr; income(s, t * pr, .05); got += t; if (got >= qty) break;
+  }
+  if (got) dst[g] = (dst[g] || 0) + got;
+}
+function produce(b, T) {
+  const r = T.rec; b.prog = Math.min(1.5, (b.prog || 0) + .5);
+  for (const g in r.in) { const need = r.in[g] * 2 - (b.in[g] || 0); if (need > 0) buy(b, g, need, b.in); }
+  if (b.prog < 1) return;
+  if (!Object.keys(r.in).every(g => (b.in[g] || 0) >= r.in[g])) { b.st = "缺料"; return; }
+  if (!Object.keys(r.out).every(g => (b.out[g] || 0) + r.out[g] <= 24)) { b.st = "滿倉"; return; }
+  b.prog -= 1; for (const g in r.in) b.in[g] -= r.in[g]; for (const g in r.out) b.out[g] = (b.out[g] || 0) + r.out[g]; b.st = "運作中";
+}
 function tick() {
-  let pop = 0, shop = 0, work = 0, pk = 0, hasS = false, hasW = false;
-  bm.forEach(b => {
-    if (b.p < 1) return; const T = TY[b.t];
-    if (T.cat === "park") { pk++; return; } if (!ok(b)) return;
-    pop += b.r; if (T.cat === "shop") { shop += T.inc; hasS = true; } if (T.cat === "work") { work += T.inc; hasW = true; }
+  const bl = []; bm.forEach(b => { if (b.p >= 1 && ok(b)) { ens(b); bl.push(b); } });
+  let pop = 0, jobs = 0, pk = 0, biz = 0;
+  bl.forEach(b => { const T = TY[b.t]; if (T.cat === "house") pop += b.r; else if (T.cat === "park") pk++; else { jobs += T.jobs || 3; biz += b.cash; } });
+  TGT = { wheat: 20, flour: 16 }; Object.keys(GD).forEach(g => { if (GD[g].need) TGT[g] = Math.max(8, pop * GD[g].need * .5); });
+  scan(bl);
+  bl.forEach(b => { const T = TY[b.t]; if (T.rec) produce(b, T); });
+  scan(bl);
+  const shops = bl.filter(b => TY[b.t].sell);
+  shops.forEach(b => {
+    const T = TY[b.t]; T.sell.forEach(g => { if (T.rec && T.rec.out[g]) return; const want = 12 - (b.out[g] || 0); if (want > 0) buy(b, g, want, b.out); });
   });
-  S.m += Math.floor(pop * 1.5) + (pop > 0 ? shop + pk : 0) + (hasS ? work : 0); syncRes();
+  scan(bl);
+  const sat = {};
+  Object.keys(GD).forEach(g => {
+    const need = GD[g].need; if (!need) return;
+    const want = pop * need / 36, rp = mp(g) * 1.35; let left = want;
+    if (want > 0) for (const s of shops) {
+      if (left <= 0) break; const a = s.out[g] || 0; if (a <= 0) continue;
+      const q = Math.min(left, a, S.rp / rp); if (q <= 0) continue; s.out[g] -= q; S.rp -= q * rp; income(s, q * rp, .15); left -= q;
+    }
+    const v = want > 0 ? 1 - left / want : 1, o = ECO.sat[g] == null ? 1 : ECO.sat[g]; sat[g] = o * .6 + v * .4;
+  });
+  const svcs = bl.filter(b => TY[b.t].svc); let ss = pop > 0 ? 0 : 1;
+  if (svcs.length && pop > 0) { const dem = pop * .25; let sp = 0; svcs.forEach(b => { const x = Math.min(S.rp, dem / svcs.length, 8); if (x > 0) { S.rp -= x; income(b, x, .15); sp += x; } }); ss = Math.min(1, sp / dem); }
+  shops.forEach(b => { const T = TY[b.t]; if (b.p >= 1 && !(T.rec && b.st === "缺料")) b.st = T.sell.some(g => (b.out[g] || 0) >= 1) ? "營業中" : "缺貨"; });
+  svcs.forEach(b => { b.st = "營業中"; });
+  const gl = ["pottery", "wood", "cloth", "iron", "wine"], gs = (gl.reduce((a, g) => a + sat[g], 0) + ss) / (gl.length + 1);
+  const emp = pop > 0 ? Math.min(1, jobs / pop) : 1, pkv = Math.min(1, pk / Math.max(1, pop / 8));
+  const hap = 100 * (.5 * sat.noodle + .2 * gs + .15 * emp + .15 * pkv);
+  ECO = { food: SUP.noodle || 0, hap: pop > 0 ? ECO.hap * .7 + hap * .3 : 50, pop: pop, jobs: jobs, biz: biz, sat: sat };
+  syncRes();
 }
 function step(d) {
   S.t += d;
   bm.forEach(b => {
     const T = TY[b.t];
     if (b.p < 1) b.p = Math.min(1, b.p + d / (T.bt || 18));
-    else if (T.cat === "house" && b.r < 4 && ok(b)) { b.mv = (b.mv || 0) + d; if (b.mv >= 4) { b.mv = 0; b.r++; syncRes(); } }
+    else if (T.cat === "house" && b.r < 4 && ok(b) && (ECO.hap >= 35 || ECO.pop < 8)) { b.mv = (b.mv || 0) + d; if (b.mv >= 4) { b.mv = 0; b.r++; S.rp += 40; syncRes(); } }
   });
   acc += d; if (acc >= 10) { acc -= 10; tick(); }
   moveRes(d);
@@ -282,8 +366,16 @@ function roof(x, y, h, rh, m, e, f) {
   const T = P(x + m - e, y + m - e, h), Rr = P(x + 1 - m + e, y + m - e, h), B = P(x + 1 - m + e, y + 1 - m + e, h), L = P(x + m - e, y + 1 - m + e, h), A = P(x + .5, y + .5, h + rh);
   poly([T, L, A], f[2]); poly([T, Rr, A], f[2]); poly([L, B, A], f[1]); poly([B, Rr, A], f[0]); return { B: B, L: L, Rr: Rr };
 }
+function bridgeTile(x, y) {
+  const ew = bridges.has(K(x - 1, y)) || bridges.has(K(x + 1, y)) || !(bridges.has(K(x, y - 1)) || bridges.has(K(x, y + 1)));
+  box(x, y, x + 1, y + 1, 0, 4, "#a98862", "#7d6143", "#c19a6e");
+  cx.strokeStyle = "rgba(60,40,20,.35)"; cx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) { const a = ew ? P(x + i / 5, y, 4) : P(x, y + i / 5, 4), c = ew ? P(x + i / 5, y + 1, 4) : P(x + 1, y + i / 5, 4); cx.beginPath(); cx.moveTo(a[0], a[1]); cx.lineTo(c[0], c[1]); cx.stroke(); }
+  if (ew) { box(x, y, x + 1, y + .07, 4, 10, "#8a6a48", "#6b4f35", "#a98862"); box(x, y + .93, x + 1, y + 1, 4, 10, "#8a6a48", "#6b4f35", "#a98862"); }
+  else { box(x, y, x + .07, y + 1, 4, 10, "#8a6a48", "#6b4f35", "#a98862"); box(x + .93, y, x + 1, y + 1, 4, 10, "#8a6a48", "#6b4f35", "#a98862"); }
+}
 function drawB(b, ts) {
-  const T = TY[b.t]; if (T.cat === "park") return drawPark(b, T, ts);
+  const T = TY[b.t]; if (T.cat === "park") return drawPark(b, T, ts); if (T.cat === "farm") return drawFarm(b, T, ts);
   const p = Math.max(.15, b.p), h = T.h * p, rh = T.r * p, m = .1, e = .14, x = b.x, y = b.y, done = b.p >= 1, dc = T.d;
   if (!done) cx.globalAlpha = .8;
   box(x + m, y + m, x + 1 - m, y + 1 - m, 0, h, T.w[0], T.w[1], null);
@@ -296,6 +388,7 @@ function drawB(b, ts) {
     else if (dc === "flag") { const t = h + rh + 12; box(x + .82, y + .82, x + .86, y + .86, h, t, "#6b4f3a", "#523b2b", null); poly([P(x + .86, y + .84, t), P(x + .86, y + .84, t - 7), P(x + 1.2, y + .84, t - 3.5)], "#d9a441"); }
     else if (dc === "cloth") ["#c94f4f", "#4f7bc9", "#e0b13a"].forEach((col, i) => poly([P(x + 1 - m, y + .25 + i * .22, h * .85), P(x + 1 - m, y + .37 + i * .22, h * .85), P(x + 1 - m, y + .37 + i * .22, h * .35), P(x + 1 - m, y + .25 + i * .22, h * .35)], col));
     else if (dc === "sign") poly([P(x + .68, y + 1 - m + .02, h * .9), P(x + .92, y + 1 - m + .02, h * .9), P(x + .92, y + 1 - m + .02, h * .55), P(x + .68, y + 1 - m + .02, h * .55)], "#8a5a2b");
+    else if (dc === "mill") { const q = P(x + 1 - m + .05, y + .5, h * .45); cx.strokeStyle = "#6b4f3a"; cx.lineWidth = 2; cx.beginPath(); cx.arc(q[0], q[1], 8, 0, 7); cx.moveTo(q[0] - 8, q[1]); cx.lineTo(q[0] + 8, q[1]); cx.moveTo(q[0], q[1] - 8); cx.lineTo(q[0], q[1] + 8); cx.stroke(); }
     else if (dc === "kiln" || dc === "anvil") { box(x + .62, y + .2, x + .78, y + .36, h * .8, h + rh + 6, "#7d7266", "#5f564c", "#8d8275"); if (dc === "anvil") box(x + .64, y + .22, x + .76, y + .34, h + rh + 6, h + rh + 9, "#e0802e", "#c9651c", "#f0a050"); }
     else if (dc === "logs") { box(x + .08, y + .84, x + .42, y + .98, 0, 5, "#b08a5e", "#7a5b3b", "#c29c6c"); box(x + .12, y + .86, x + .38, y + .96, 5, 9, "#b08a5e", "#7a5b3b", "#c29c6c"); }
     else if (dc === "yarn") [["#c94f4f", .08], ["#4f7bc9", .3], ["#e0b13a", .52]].forEach(k => box(x + k[1], y + .84, x + k[1] + .16, y + .98, 0, 6, k[0], k[0], k[0]));
@@ -310,7 +403,7 @@ function drawB(b, ts) {
     cx.fillStyle = "#fff"; cx.font = "bold 10px sans-serif"; cx.textAlign = "center"; cx.fillText("!", q[0], q[1] + 3.5);
   }
 }
-function drawPark(b, T, ts) {
+function drawPark(b, T, ts, part) {
   const p = Math.max(.2, b.p), x = b.x, y = b.y, c = P(x + .5, y + .5), X = c[0], Y = c[1];
   const shade = (rx, ry) => { cx.fillStyle = "rgba(0,0,0,.16)"; cx.beginPath(); cx.ellipse(X, Y, rx * p, ry * p, 0, 0, 7); cx.fill(); };
   const k = T.k;
@@ -325,10 +418,18 @@ function drawPark(b, T, ts) {
     poly([P(x + .04, y + .04), P(x + .96, y + .04), P(x + .96, y + .96), P(x + .04, y + .96)], "#9a978a", false);
     poly([P(x + .14, y + .14), P(x + .86, y + .14), P(x + .86, y + .86), P(x + .14, y + .86)], "hsl(195 45% 55%)", false);
     cx.strokeStyle = "rgba(255,255,255,.5)"; cx.lineWidth = 1; cx.beginPath(); const w = Math.sin(ts / 600); cx.ellipse(X, Y, 10 + 3 * w, 5 + 1.5 * w, 0, 0, 7); cx.stroke();
+    if (b.br) {
+      const ew = roads.has(K(x - 1, y)) || roads.has(K(x + 1, y)) || !(roads.has(K(x, y - 1)) || roads.has(K(x, y + 1)));
+      if (ew) { box(x, y + .36, x + 1, y + .64, 3, 6, "#c19a6e", "#8a6a48", "#d3ad80"); box(x, y + .34, x + 1, y + .38, 6, 10, "#8a6a48", "#6b4f35", "#a98862"); box(x, y + .62, x + 1, y + .66, 6, 10, "#8a6a48", "#6b4f35", "#a98862"); }
+      else { box(x + .36, y, x + .64, y + 1, 3, 6, "#c19a6e", "#8a6a48", "#d3ad80"); box(x + .34, y, x + .38, y + 1, 6, 10, "#8a6a48", "#6b4f35", "#a98862"); box(x + .62, y, x + .66, y + 1, 6, 10, "#8a6a48", "#6b4f35", "#a98862"); }
+    }
   } else if (k === "pavilion") {
-    poly([P(x + .08, y + .08), P(x + .92, y + .08), P(x + .92, y + .92), P(x + .08, y + .92)], "#cfc5ae", false);
-    const h = 22 * p; [[.2, .2], [.8, .2], [.2, .8], [.8, .8]].forEach(q => box(x + q[0] - .03, y + q[1] - .03, x + q[0] + .03, y + q[1] + .03, 0, h, "#a8553a", "#85402b", null));
-    roof(x, y, h, 12 * p, .04, .08, ["#c4503a", "#9a3a28", "#d96a52"]);
+    const h = 22 * p;
+    if (part !== 1) {
+      poly([P(x + .08, y + .08), P(x + .92, y + .08), P(x + .92, y + .92), P(x + .08, y + .92)], "#cfc5ae", false);
+      [[.2, .2], [.8, .2], [.2, .8], [.8, .8]].forEach(q => box(x + q[0] - .03, y + q[1] - .03, x + q[0] + .03, y + q[1] + .03, 0, h, "#a8553a", "#85402b", null));
+    }
+    if (part !== 0) roof(x, y, h, 12 * p, .04, .08, ["#c4503a", "#9a3a28", "#d96a52"]);
   } else if (k === "bamboo") {
     shade(14, 6); [[.2, .3, 28], [.45, .2, 34], [.7, .35, 30], [.3, .6, 32], [.6, .65, 36], [.8, .8, 28], [.2, .85, 30]].forEach(s => {
       box(x + s[0] - .03, y + s[1] - .03, x + s[0] + .03, y + s[1] + .03, 0, s[2] * p, "#6f9a55", "#58803f", "#84ad69");
@@ -341,8 +442,14 @@ function drawPark(b, T, ts) {
     poly([[X + 4 * p, Y - 4], [X + 16 * p, Y - 4], [X + 14 * p, Y + 3], [X + 5 * p, Y + 3]], "#7c7f80");
   }
 }
+function drawFarm(b, T, ts) {
+  const p = Math.max(.2, b.p), x = b.x, y = b.y, g = (b.prog || 0) % 1, col = g < .5 ? "#7fb45a" : g < .85 ? "#a9bf55" : "#d6b84a", hg = (3 + g * 9) * p;
+  poly([P(x + .06, y + .06), P(x + .94, y + .06), P(x + .94, y + .94), P(x + .06, y + .94)], "#8a6a44", false);
+  cx.strokeStyle = col; cx.lineWidth = 1.6;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 5; j++) { const q = P(x + .18 + i * .2, y + .14 + j * .17, 0); cx.beginPath(); cx.moveTo(q[0], q[1]); cx.lineTo(q[0] + Math.sin(ts / 500 + i + j) * .8, q[1] - hg); cx.stroke(); }
+}
 function drawR(r, ts) {
-  const q = P(r.x, r.y), x = q[0], y = q[1], bob = Math.abs(Math.sin(ts / 140 + r.w)) * 1.2;
+  const rk = K(Math.floor(r.x), Math.floor(r.y)), rb = bm.get(rk), q = P(r.x, r.y, bridges.has(rk) ? 4 : (rb && rb.br ? 5 : 0)), x = q[0], y = q[1], bob = Math.abs(Math.sin(ts / 140 + r.w)) * 1.2;
   cx.fillStyle = "rgba(0,0,0,.22)"; cx.beginPath(); cx.ellipse(x, y, 4, 2, 0, 0, 7); cx.fill();
   cx.fillStyle = ["#b8452e", "#3f6f8a", "#8a6a2c", "#5a7a46"][r.c]; cx.fillRect(x - 2, y - 9 - bob, 4, 7);
   cx.fillStyle = "#e8cfa8"; cx.beginPath(); cx.arc(x, y - 11 - bob, 2.4, 0, 7); cx.fill();
@@ -361,14 +468,18 @@ function draw(ts) {
   const s0 = Math.floor((cam.y - VH / 2 / Z) / HH) - 3, s1 = Math.ceil((cam.y + VH / 2 / Z) / HH) + 5;
   for (let s = s0; s <= s1; s++) for (let d = d0 + (((s + d0) % 2) + 2) % 2; d <= d1; d += 2) {
     const x = (s + d) / 2, y = (s - d) / 2; if (!inW(x, y)) continue;
-    if (isW(x, y)) tile(x, y, WC[(((Math.sin(ts / 700 + x * .8 + y * .5) + 1) * 3.5) | 0)]);
+    if (isW(x, y)) { tile(x, y, WC[(((Math.sin(ts / 700 + x * .8 + y * .5) + 1) * 3.5) | 0)]); if (bridges.has(K(x, y))) bridgeTile(x, y); }
     else if (roads.has(K(x, y))) tile(x, y, conn.has(K(x, y)) ? "#c9c4b1" : "#bcb7a5", "#9a9582");
     else tile(x, y, (x === RX - 1 || x === RX + 2) ? "#c3bd8e" : GR[hs(x, y) % 3]);
   }
   poly([P(RX, DOCK.y + .2), P(RX + .8, DOCK.y + .2), P(RX + .8, DOCK.y + .8), P(RX, DOCK.y + .8)], "#8b6b4b");
   if (hov && tool !== "look" && inW(hov[0], hov[1])) tile(hov[0], hov[1], can(hov[0], hov[1]) ? "rgba(110,220,140,.55)" : "rgba(220,90,70,.55)");
   const it = [], dk = dark(hr()), vis = (x, y) => { const s = x + y, d = x - y; return s >= s0 && s <= s1 && d >= d0 && d <= d1; };
-  bm.forEach(b => { if (vis(b.x, b.y)) it.push([b.x + b.y + .5, () => drawB(b, ts)]); });
+  bm.forEach(b => {
+    if (!vis(b.x, b.y)) return; const T = TY[b.t];
+    if (T.k === "pavilion") { it.push([b.x + b.y + .4, () => drawPark(b, T, ts, 0)]); it.push([b.x + b.y + 1.2, () => drawPark(b, T, ts, 1)]); }
+    else it.push([b.x + b.y + .5, () => drawB(b, ts)]);
+  });
   R.forEach((r, i) => { if ((dk > .6 && i % 3) || !vis(r.x, r.y)) return; it.push([r.x + r.y, () => drawR(r, ts)]); });
   const ty = Math.round(cam.y / HH - RX), st = Math.floor((ty - 50) / 100) * 100;
   for (let k = 0; k < 5; k++) { const by = st + ((ts / 1000 * .45 + k * 20) % 100), bx = RX + (k % 2 ? .65 : 1.3); if (by > 0 && by < N - 2) it.push([bx + by + .6, () => boat(bx, by, ts)]); }
@@ -377,7 +488,7 @@ function draw(ts) {
   if (dk > 0) {
     cx.fillStyle = "rgba(16,26,58," + (.5 * dk) + ")"; cx.fillRect(0, 0, VW, VH);
     cx.setTransform(T0[0], T0[1], T0[2], T0[3], T0[4], T0[5]); cx.globalCompositeOperation = "lighter";
-    bm.forEach(b => { if (b.p < 1 || TY[b.t].cat === "park" || !vis(b.x, b.y)) return; const q = P(b.x + .5, b.y + 1, 10); cx.fillStyle = "rgba(255,176,80," + (.32 * dk) + ")"; cx.beginPath(); cx.arc(q[0], q[1], 13, 0, 7); cx.fill(); });
+    bm.forEach(b => { if (b.p < 1 || TY[b.t].cat === "park" || TY[b.t].cat === "farm" || !vis(b.x, b.y)) return; const q = P(b.x + .5, b.y + 1, 10); cx.fillStyle = "rgba(255,176,80," + (.32 * dk) + ")"; cx.beginPath(); cx.arc(q[0], q[1], 13, 0, 7); cx.fill(); });
     cx.globalCompositeOperation = "source-over";
   }
 }
@@ -397,7 +508,7 @@ cv.addEventListener("pointerdown", e => {
   cv.setPointerCapture(e.pointerId); ptr.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
   if (ptr.size === 2) { const v = Array.from(ptr.values()); pinch = { d: Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y), z: Z, mx: (v[0].x + v[1].x) / 2, my: (v[0].y + v[1].y) / 2 }; drag = { moved: true }; return; }
   const t = tileAt(e.clientX, e.clientY); hov = t; const pan = e.button === 2 || e.button === 1;
-  drag = { moved: false, pan: pan, paint: !pan && (tool === "road" || tool === "del") };
+  drag = { moved: false, pan: pan, paint: !pan && (tool === "road" || tool === "del" || tool === "bridge") };
   if (drag.paint) { act(t[0], t[1]); lastT = t[0] + "," + t[1]; }
 });
 cv.addEventListener("pointermove", e => {
@@ -434,18 +545,32 @@ $("#bSpd").onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; $("#
 $("#zi").onclick = () => { zoomAt(VW / 2, VH / 2, Z * 1.25); dirty(); }; $("#zo").onclick = () => { zoomAt(VW / 2, VH / 2, Z / 1.25); dirty(); };
 $("#zh").onclick = home;
 $("#bReset").onclick = () => { if (confirm("要清除目前的小鎮，重新開始嗎？")) { try { localStorage.removeItem(KEY); localStorage.removeItem("town_save_v1"); } catch (e) {} location.reload(); } };
+function renderEco() {
+  const rows = Object.keys(GD).map(g => {
+    const T = GD[g];
+    return "<tr><td>" + T.n + "</td><td>" + Math.floor(SUP[g] || 0) + "</td><td>" + (mp(g) * 1.35).toFixed(1) + "</td><td>" + (T.need ? Math.round((ECO.sat[g] == null ? 1 : ECO.sat[g]) * 100) + "%" : "—") + "</td></tr>";
+  }).join("");
+  $("#ecoBody").innerHTML = "<p>公庫 <b>" + Math.floor(S.m) + "</b>　居民財產 <b>" + Math.floor(S.rp) + "</b>　商業資金 <b>" + Math.floor(ECO.biz) + "</b>（景元）</p>" +
+    "<p>人口 " + ECO.pop + "　職缺 " + ECO.jobs + "　建築 " + bm.size + "　幸福度 " + Math.round(ECO.hap) + "%</p>" +
+    "<table><tr><th>商品</th><th>庫存</th><th>零售價</th><th>需求滿足</th></tr>" + rows + "</table>" +
+    '<p class="nt">生產鏈：麥田產小麥→磨坊磨成麵粉→麵食店做成麵食賣給居民。陶坊、木作坊、織坊、鐵鋪要有雜貨鋪或布莊來收貨，釀酒坊要有酒樓。商鋪賣出貨物時，15% 稅收進公庫；居民吃不飽，幸福度會下降，新居民就不來了。</p>';
+}
 function hud() {
   let pop = 0; bm.forEach(b => { pop += b.r; });
   const h = hr(), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
-  $("#sPop").textContent = pop; $("#sB").textContent = bm.size; $("#sM").textContent = Math.floor(S.m); $("#sR").textContent = roads.size;
+  $("#sPop").textContent = pop; $("#sFood").textContent = Math.floor(ECO.food); $("#sHap").textContent = Math.round(ECO.hap); $("#sM").textContent = Math.floor(S.m);
   $("#clk").textContent = "第" + (Math.floor(S.t / 360) + 1) + "日 " + pad(hh) + ":" + pad(mm) + "・" + SH[Math.floor(((hh + 1) % 24) / 2)] + "時" + (dark(h) > .5 ? "・夜" : "");
+  if (ecoOpen) renderEco();
 }
+$("#bEco").onclick = () => { ecoOpen = true; $("#eco").style.display = "flex"; renderEco(); };
+$("#ecoX").onclick = () => { ecoOpen = false; $("#eco").style.display = "none"; };
 
 // ===== 啟動 =====
 fit(); Z = Math.max(.55, Math.min(1.2, VW / 600)); addEventListener("resize", fit);
 let had = load();
 if (!had && migrate()) { had = true; home(); save(); }
 if (!had) fresh();
+bm.forEach(b => { const T = TY[b.t]; if (T.k === "pavilion" || b.br) roads.add(K(b.x, b.y)); });
 calcConn(); syncRes(); clampCam(); renderSub(); updBar();
 if (!had) introOpen = true; else $("#intro").style.display = "none";
 $("#go").onclick = () => { introOpen = false; $("#intro").style.display = "none"; save(); };
