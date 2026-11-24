@@ -79,9 +79,25 @@ button,a{font:inherit;color:var(--ink)}
 .stg-box{padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.35);border:1px solid rgba(29,58,53,.16);margin:6px 0}
 .stg-ok{color:#2e6f40;font-weight:bold}
 .stg-lack{color:#a8382b;font-weight:bold}
+#wxBadge{font-size:.74rem;padding:2px 7px;border-radius:6px;background:rgba(111,163,189,.32);border:1px solid rgba(29,58,53,.32);margin-left:5px;vertical-align:middle;cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+#wxBadge:active{transform:scale(.96)}
+#wxModal{position:fixed;left:8px;right:8px;top:calc(104px + env(safe-area-inset-top,0px));max-height:74vh;display:none;flex-direction:column;padding:12px;overflow:hidden;z-index:7}
+#wxModal .eh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+#wxModal .eh button{padding:5px 12px;border-radius:8px;border:1px solid rgba(29,58,53,.3);background:transparent;cursor:pointer}
+#wxBody{overflow:auto;font-size:.86rem;line-height:1.65}
+.wx-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0}
+.wx-grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:6px 0}
+.wx-opt{padding:6px 4px;border-radius:8px;border:1px solid rgba(29,58,53,.26);background:rgba(255,255,255,.35);cursor:pointer;text-align:center;font-size:.82rem}
+.wx-opt.on{background:var(--amb);border-color:#8a5f12;color:#2a1d05;font-weight:bold}
+.wx-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.32);border:1px solid rgba(29,58,53,.15);margin:6px 0}
+.ev-chain{padding:8px 10px;border-radius:9px;background:rgba(211,154,47,.16);border:1px solid rgba(138,95,18,.32);margin:6px 0}
+.ev-steps{display:flex;gap:4px;margin-top:5px;font-size:.75rem}
+.ev-step{flex:1;padding:2px 4px;border-radius:5px;background:rgba(255,255,255,.35);text-align:center;opacity:.65}
+.ev-step.cur{background:var(--amb);color:#2a1d05;font-weight:bold;opacity:1}
+.ev-step.done{background:rgba(46,111,64,.22);color:#1f522e;opacity:.9}
 #bRoster,#bChron,#bObs{padding:3px 8px;font-size:.78rem;background:transparent;border-radius:8px;cursor:pointer;border:1px solid rgba(29,58,53,.3)}
 #obsExit{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:none;padding:8px 14px;font-size:.86rem;z-index:30;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.18)}
-body.obs #top,body.obs #zoom,body.obs #bar,body.obs #sub,body.obs #card,body.obs #eco,body.obs #roster,body.obs #chron,body.obs #stageModal,body.obs #resCard,body.obs #debug{display:none!important}
+body.obs #top,body.obs #zoom,body.obs #bar,body.obs #sub,body.obs #card,body.obs #eco,body.obs #roster,body.obs #chron,body.obs #stageModal,body.obs #wxModal,body.obs #resCard,body.obs #debug{display:none!important}
 body.obs #obsExit{display:flex;align-items:center;gap:6px}
 </style>
 </head>
@@ -90,7 +106,7 @@ body.obs #obsExit{display:flex;align-items:center;gap:6px}
 <div id="top">
   <div class="row">
     <a class="pn b" id="backToBank" href="./index.html">← 題庫</a>
-    <div class="pn" id="hud"><div><b>山河築夢</b><span id="stageBadge" title="點擊查看城鎮規模與晉升條件">荒野聚落 ▾</span></div><span id="clk"></span></div>
+    <div class="pn" id="hud"><div><b>山河築夢</b><span id="stageBadge" title="點擊查看城鎮規模與晉升條件">荒野聚落 ▾</span><span id="wxBadge" title="點擊調整四季與天氣">春・晴朗 ▾</span></div><span id="clk"></span></div>
     <button class="pn b" id="bSpd" aria-label="遊戲速度">1×</button>
     <button class="pn b" id="bPause">暫停</button>
   </div>
@@ -112,6 +128,7 @@ body.obs #obsExit{display:flex;align-items:center;gap:6px}
 <div id="roster" class="pn"><div class="eh"><b>全鎮人口名冊</b><div><select id="rosterFilter"><option value="all">全部居民</option><option value="unemployed">待業中</option><option value="employed">已就業</option><option value="child">未成年</option></select> <button id="rosterAutoJob">一鍵補缺</button> <button id="rosterX">關閉</button></div></div><div id="rosterBody"></div></div>
 <div id="chron" class="pn"><div class="eh"><b>城鎮編年史</b><button id="chronX">關閉</button></div><div id="chronBody"></div></div>
 <div id="stageModal" class="pn"><div class="eh"><b>城鎮規模與晉升指南</b><button id="stageX">關閉</button></div><div id="stageBody"></div></div>
+<div id="wxModal" class="pn"><div class="eh"><b>四季與天象控制</b><button id="wxX">關閉</button></div><div id="wxBody"></div></div>
 <div id="resCard" class="pn"><div class="rh"><b id="resName">居民</b><button id="resX">關閉</button></div><div class="body" id="resBody"></div></div>
 <div id="debug" class="pn"></div>
 <div id="sub" class="pn"></div>
@@ -144,7 +161,31 @@ const hr = () => (S.t / 15) % 24;
 const dark = h => (h >= 20 || h < 4) ? 1 : h >= 18 ? (h - 18) / 2 : h < 6 ? (6 - h) / 2 : 0;
 const pad = n => String(n).padStart(2, "0");
 const SH = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
-const GR = { meadow: ["#a6ba72", "#9db46b", "#abbf79"], plain: ["#9db46b", "#96ac64", "#a4b872"], forest: ["#7fa85e", "#76a055", "#88b066"], mountain: ["#8f9a86", "#84907b", "#9aa491"], river: ["#c3bd8e", "#bdb78a", "#c9c394"], water: ["#6fa3bd", "#6a9db6", "#74a9c2"] };
+const GR_SEASON = [
+  // 0: 春 (嫩綠繁花)
+  { meadow: ["#a6ba72", "#9db46b", "#b2c77d"], plain: ["#9db46b", "#96ac64", "#a4b872"], forest: ["#7fa85e", "#76a055", "#8ab368"], mountain: ["#8f9a86", "#84907b", "#9aa491"], river: ["#c3bd8e", "#bdb78a", "#c9c394"], water: ["#6fa3bd", "#6a9db6", "#74a9c2"] },
+  // 1: 夏 (濃綠蒼翠)
+  { meadow: ["#88ab5a", "#7fa252", "#93b564"], plain: ["#7ea053", "#75974b", "#88aa5c"], forest: ["#5e8c45", "#55823d", "#68964e"], mountain: ["#7f8f79", "#74846e", "#8a9a84"], river: ["#c5bc86", "#beb580", "#ccc38e"], water: ["#5f98b5", "#5991ae", "#669fbc"] },
+  // 2: 秋 (金黃霜葉)
+  { meadow: ["#c4b068", "#bba65f", "#ccb872"], plain: ["#bba35d", "#b19954", "#c4ac66"], forest: ["#c78646", "#b8783c", "#d49654"], mountain: ["#998e7c", "#8e8372", "#a49987"], river: ["#c7b884", "#bfb07d", "#cfc08c"], water: ["#6996ad", "#628fa6", "#709db4"] },
+  // 3: 冬 (銀霜覆雪)
+  { meadow: ["#dce5e2", "#d3ddd9", "#e4ecea"], plain: ["#d2dcd9", "#c9d4d0", "#dbe4e1"], forest: ["#9fb3a8", "#94a89d", "#aabdb2"], mountain: ["#cfd8d7", "#c4cecd", "#dae2e1"], river: ["#b8c2be", "#afb9b5", "#c1cbc7"], water: ["#678ea3", "#60869b", "#6f96ab"] }
+];
+const SEASONS = [
+  { id: 0, name: "春", full: "春季", farmMult: 1.15, desc: "春雨潤澤，麥田生長 +15%" },
+  { id: 1, name: "夏", full: "夏季", farmMult: 1.25, desc: "日照充足，麥田生長 +25%" },
+  { id: 2, name: "秋", full: "秋季", farmMult: 1.35, desc: "秋收豐年，麥田生長 +35%" },
+  { id: 3, name: "冬", full: "冬季", farmMult: 0.55, desc: "天寒地凍，麥田生長 -45%" }
+];
+const WEATHERS = [
+  { id: "clear", name: "晴朗", icon: "☀️", farmMult: 1.0, moodDelta: 2, spdMult: 1.0, desc: "萬里無雲，百姓心情愉悅，出行順暢。" },
+  { id: "cloudy", name: "多雲", icon: "⛅", farmMult: 1.0, moodDelta: 0, spdMult: 1.0, desc: "微風拂面，氣候宜人。" },
+  { id: "rain", name: "細雨", icon: "🌧️", farmMult: 1.25, moodDelta: -1, spdMult: 0.85, desc: "畫面落雨線；農田灌溉 +25%，行人撐傘慢行。" },
+  { id: "storm", name: "雷雨", icon: "⛈️", farmMult: 0.85, moodDelta: -4, spdMult: 0.7, desc: "狂風暴雨伴隨閃電；行人避雨，偶發短暫積水。" },
+  { id: "snow", name: "降雪", icon: "❄️", farmMult: 0.6, moodDelta: 1, spdMult: 0.72, desc: "畫面飄落雪花；銀裝素裹，出行速度略降。" },
+  { id: "fog", name: "薄霧", icon: "🌫️", farmMult: 0.95, moodDelta: 0, spdMult: 0.88, desc: "江面升起晨霧；朦朧詩意，商船緩行。" }
+];
+const WX_MAP = {}; WEATHERS.forEach(w => { WX_MAP[w.id] = w; });
 const WC = []; for (let i = 0; i < 8; i++) WC.push("hsl(197 42% " + (47 + i * .9) + "%)");
 
 const VIEW_AI_FULL = 800;
@@ -286,7 +327,42 @@ let bridges = new Set();
 let townStage = 0; // 0: 荒野聚落, 1: 繁榮村落, 2: 商業城鎮, 3: 繁華都會
 let chronicle = []; // [{ day, tag, text }]
 let milestones = {}; // track one-time historical milestones
-let rosterOpen = false, chronOpen = false, stageOpen = false, obsMode = false;
+let rosterOpen = false, chronOpen = false, stageOpen = false, wxOpen = false, obsMode = false;
+let seasonAuto = true, seasonManual = 0, seasonDays = 10;
+let weatherAuto = true, weatherId = "clear", weatherTimer = 180;
+let lightningAlpha = 0, nextLightning = 12;
+let activeEvent = null; // 單發性事件 { name, endT, farmMult, moodDelta }
+let activeChain = null; // 連續性事件鏈 { id, step, timer, data }
+let eventCooldown = 190;
+let chainCooldown = 260;
+let wetAccum = 0; // 連續降雨累積時間
+let dockSilted = false; // 河道是否淤積（影響商船與市舶稅）
+const wxParticles = [];
+for (let i = 0; i < 160; i++) {
+  wxParticles.push({ x: Math.random(), y: Math.random(), z: 0.5 + Math.random() * 0.9, ph: Math.random() * 6.28 });
+}
+
+function getCurSeason() {
+  if (!seasonAuto) return seasonManual;
+  const day = Math.floor(S.t / 360);
+  return Math.floor(day / seasonDays) % 4;
+}
+function getCurWeather() {
+  return WX_MAP[weatherId] || WEATHERS[0];
+}
+function rollNaturalWeather(sIdx) {
+  const r = Math.random();
+  if (sIdx === 0) return r < 0.42 ? "clear" : r < 0.68 ? "cloudy" : r < 0.92 ? "rain" : "fog";
+  if (sIdx === 1) return r < 0.45 ? "clear" : r < 0.68 ? "cloudy" : r < 0.86 ? "rain" : "storm";
+  if (sIdx === 2) return r < 0.48 ? "clear" : r < 0.76 ? "cloudy" : r < 0.90 ? "fog" : "rain";
+  return r < 0.34 ? "clear" : r < 0.56 ? "cloudy" : r < 0.90 ? "snow" : "fog";
+}
+function updateWxBadge() {
+  const s = SEASONS[getCurSeason()];
+  const w = getCurWeather();
+  const el = $("#wxBadge");
+  if (el) el.textContent = s.name + "・" + w.icon + w.name + " ▾";
+}
 let obsAngle = 0, obsTarget = null, obsTimer = 0;
 const STAGES = [
   { name: "荒野聚落", short: "荒野", desc: "河畔初闢，炊煙初起（初始規模）", req: { pop: 0, food: 0, hap: 0, money: 0, shops: 0, works: 0, farms: 0, parks: 0 } },
@@ -323,6 +399,221 @@ function addChronicle(tag, text, key) {
   const day = Math.floor(S.t / 360) + 1;
   chronicle.push({ day, tag, text });
   if (chronicle.length > 120) chronicle.shift();
+}
+
+
+const EVENT_CHAINS = {
+  flood_silt: {
+    title: "河道水患與疏浚",
+    steps: ["連日霪雨", "河道淤積", "疏浚工程", "航道重開"],
+    onEnter(step, data) {
+      if (step === 0) {
+        addChronicle("水患·起因", "連日陰雨綿綿，河水上漲、田壟泥濘，農作暫緩生長。");
+        say("🌧️【連續事件 1/4】連日霪雨，農田過濕生長放緩！");
+        return { dur: 140, farmMult: 0.65, moodDelta: -2 };
+      } else if (step === 1) {
+        dockSilted = true;
+        addChronicle("水患·惡化", "上游泥沙隨雨水沖刷而下，碼頭河道淤積，商船通行受阻！");
+        say("⚠️【連續事件 2/4】河道淤積，碼頭航運暫停、商船減少！");
+        return { dur: 150, farmMult: 0.9, moodDelta: -3 };
+      } else if (step === 2) {
+        const fee = Math.min(Math.floor(S.m * 0.06), 90);
+        S.m = Math.max(0, S.m - fee);
+        // 工錢發給在職或待業居民
+        if (residents.size > 0 && fee > 0) {
+          const each = fee / residents.size;
+          residents.forEach(r => { r.wallet = (r.wallet || 0) + each; });
+          syncRp();
+        }
+        addChronicle("水患·轉折", "公庫撥款 " + fee + " 文徵召民夫開展河道疏浚，清淤通航。");
+        say("⛏️【連續事件 3/4】啟動河道疏浚工程（工費 " + fee + " 文）");
+        return { dur: 150, farmMult: 1.0, moodDelta: 0 };
+      } else {
+        dockSilted = false;
+        const surge = 180 + Math.floor(residents.size * 8);
+        S.m += surge;
+        addChronicle("水患·結局", "河道疏浚竣工、航道重開！滯留外地商隊集中入港，市舶稅進帳 " + surge + " 文。");
+        say("⛵【連續事件 4/4】航道重開・商隊大集！鎮庫進帳 +" + surge + " 文！");
+        return { dur: 180, farmMult: 1.1, moodDelta: 4 };
+      }
+    }
+  },
+  scholar_visit: {
+    title: "名士遊歷與文風",
+    steps: ["文人遊歷", "題詩傳名", "遠客慕名"],
+    onEnter(step, data) {
+      if (step === 0) {
+        addChronicle("文風·起因", "江南名士乘舟遊歷至此，流連於河畔茶坊與涼亭之間。");
+        say("📜【連續事件 1/3】文人名士抵達小鎮遊歷！");
+        return { dur: 160, farmMult: 1.0, moodDelta: 3 };
+      } else if (step === 1) {
+        let teaBonus = 0;
+        forEachB(b => {
+          if (b.p >= 1 && (b.t === "s2" || b.t === "s6" || b.t === "p4")) {
+            b.cash = (b.cash || 0) + 45;
+            teaBonus += 45;
+          }
+        });
+        residents.forEach(r => { if (r.jobKey) r.skill = Math.min(100, (r.skill || 0) + 4); });
+        addChronicle("文風·發酵", "名士題詩讚詠河畔風光，詩篇傳遍鄰郡，茶坊酒樓客流大增（營業增收 " + teaBonus + " 文）。");
+        say("🖋️【連續事件 2/3】名士題詩傳名，商鋪興旺、匠人受教！");
+        return { dur: 170, farmMult: 1.0, moodDelta: 5 };
+      } else {
+        const vacant = allBuildings().filter(b => TY[b.t].cat === "house" && b.p >= 1 && ok(b) && (!b.hk || !households.get(b.hk) || households.get(b.hk).members.length === 0));
+        if (vacant.length > 0) {
+          populateHouse(vacant[0]);
+          addChronicle("文風·結局", "遠方書生與工匠慕詩名而來，攜家眷遷入小鎮空置民居！");
+          say("🏡【連續事件 3/3】遠客慕名遷居，新住戶入住空民居！");
+        } else {
+          const gift = 110;
+          S.m += gift;
+          addChronicle("文風·結局", "慕名而來的書商贈書並捐資 " + gift + " 文助興文教，全鎮幸福提升。");
+          say("📚【連續事件 3/3】慕名書商捐資 " + gift + " 文興辦文教！");
+        }
+        return { dur: 160, farmMult: 1.0, moodDelta: 4 };
+      }
+    }
+  },
+  grand_festival: {
+    title: "豐年河燈廟會",
+    steps: ["節慶籌備", "燈會開張", "餘韻綿長"],
+    onEnter(step, data) {
+      if (step === 0) {
+        addChronicle("節慶·起因", "五穀豐登、糧倉充實，全鎮商戶與百姓開始張羅河燈廟會。");
+        say("🏮【連續事件 1/3】全鎮開始籌備盛大河燈廟會！");
+        return { dur: 150, farmMult: 1.1, moodDelta: 3 };
+      } else if (step === 1) {
+        let shopBoom = 0;
+        forEachB(b => {
+          if (b.p >= 1 && TY[b.t].cat === "shop") {
+            b.cash = (b.cash || 0) + 60;
+            shopBoom += 60;
+          }
+        });
+        residents.forEach(r => {
+          r.mood = Math.min(100, (r.mood || 60) + 14);
+          r.needs.joy = Math.min(100, (r.needs.joy || 60) + 20);
+          r.needs.soc = Math.min(100, (r.needs.soc || 60) + 20);
+        });
+        addChronicle("節慶·高潮", "河燈廟會盛大開張！滿河燈火如晝，各商鋪營收增厚（合計 +" + shopBoom + " 文），萬民同樂！");
+        say("🎆【連續事件 2/3】河燈廟會開張！商鋪大賺、百姓歡騰！");
+        return { dur: 190, farmMult: 1.15, moodDelta: 9 };
+      } else {
+        const taxGift = 90 + Math.floor(residents.size * 5);
+        S.m += taxGift;
+        addChronicle("節慶·落幕", "廟會圓滿落幕，遠近香客消費帶動市集稅收進帳 " + taxGift + " 文。");
+        say("✨【連續事件 3/3】廟會圓滿落幕，市集稅收 +" + taxGift + " 文！");
+        return { dur: 140, farmMult: 1.0, moodDelta: 3 };
+      }
+    }
+  }
+};
+
+function startEventChain(chainId) {
+  const def = EVENT_CHAINS[chainId];
+  if (!def) return;
+  const eff = def.onEnter(0, {});
+  activeChain = {
+    id: chainId,
+    step: 0,
+    timer: eff.dur || 160,
+    farmMult: eff.farmMult || 1.0,
+    moodDelta: eff.moodDelta || 0
+  };
+}
+
+function stepEventChain(dt) {
+  if (!activeChain) return;
+  activeChain.timer -= dt;
+  if (activeChain.timer <= 0) {
+    const def = EVENT_CHAINS[activeChain.id];
+    if (!def) { activeChain = null; return; }
+    const nextStep = activeChain.step + 1;
+    if (nextStep < def.steps.length) {
+      const eff = def.onEnter(nextStep, activeChain);
+      activeChain.step = nextStep;
+      activeChain.timer = eff.dur || 160;
+      activeChain.farmMult = eff.farmMult || 1.0;
+      activeChain.moodDelta = eff.moodDelta || 0;
+    } else {
+      activeChain = null;
+      dockSilted = false;
+      chainCooldown = 280 + Math.random() * 200;
+    }
+  }
+}
+
+function triggerSingleEvent() {
+  const wId = weatherId;
+  const pool = [
+    {
+      name: dockSilted ? "陸路行商繞道" : "外地商隊抵達",
+      dur: 180,
+      run() {
+        if (dockSilted) {
+          const bonus = 55;
+          S.m += bonus;
+          addChronicle("商貿", "因河道淤積，外地商隊改走陸路小規模貿易，繳稅 " + bonus + " 文。");
+          say("🐪 河道淤積，商隊改走陸路抵達（稅收 +" + bonus + " 文）");
+        } else {
+          const bonus = 120 + Math.floor(residents.size * 6);
+          S.m += bonus;
+          addChronicle("商貿", "外地商隊滿載貨船抵達碼頭採買，繳納市舶稅 " + bonus + " 文。");
+          say("⛵ 外地商隊抵達碼頭，鎮庫進帳 +" + bonus + " 文！");
+        }
+      }
+    },
+    {
+      name: "鄰鎮糧商急購",
+      dur: 160,
+      run() {
+        let sold = 0, earn = 0;
+        forEachB(b => {
+          if (b.p >= 1 && b.out && (b.out.wheat || 0) >= 6) {
+            const q = Math.min(6, Math.floor(b.out.wheat / 2));
+            b.out.wheat -= q;
+            const pay = q * 4;
+            b.cash = (b.cash || 0) + pay;
+            sold += q; earn += pay;
+          }
+        });
+        if (sold > 0) {
+          addChronicle("商貿", "鄰鎮糧商高價急購小麥 " + sold + " 份，農戶獲利 " + earn + " 文。");
+          say("🌾 鄰鎮糧商急購小麥 " + sold + " 份，獲利 " + earn + " 文！");
+        } else {
+          S.m += 75;
+          addChronicle("商貿", "過路行商在茶肆歇腳，留下過路商稅 75 文。");
+          say("💰 行商過境歇腳，鎮庫進帳 75 文！");
+        }
+      }
+    },
+    {
+      name: "巧匠路過指點",
+      dur: 160,
+      run() {
+        let cnt = 0;
+        residents.forEach(r => { if (r.jobKey) { r.skill = Math.min(100, (r.skill || 0) + 4); cnt++; } });
+        addChronicle("百工", "外地巧匠路過作坊切磋技藝，" + cnt + " 位在職居民手藝精進。");
+        say("🛠️ 巧匠路過指點，在職居民技能提升！");
+      }
+    }
+  ];
+
+  if (wId === "snow") {
+    pool.push({
+      name: "瑞雪兆豐年",
+      dur: 200,
+      farmMult: 1.25,
+      run() {
+        addChronicle("天象", "瑞雪厚覆麥田滋養地力，來日農作收成看漲！");
+        say("❄️ 瑞雪兆豐年，麥田地力滋養提升！");
+      }
+    });
+  }
+
+  const ev = randOf(pool);
+  activeEvent = { name: ev.name, endT: S.t + ev.dur, farmMult: ev.farmMult || 1.0, moodDelta: ev.moodDelta || 0 };
+  ev.run();
 }
 
 function evalTownStage() {
@@ -637,7 +928,8 @@ function aiStep(r, dt) {
   r.needs.soc = Math.max(0, r.needs.soc - dt * .18);
   if (r.state === "move" && r.path && r.path.length) {
     const node = r.path[r.pathIndex], tx = node[0] + .5, ty = node[1] + .5;
-    const dx = tx - r.x, dy = ty - r.y, dd = Math.hypot(dx, dy), v = dt * 1.1;
+    const wxSpd = getCurWeather().spdMult || 1.0;
+    const dx = tx - r.x, dy = ty - r.y, dd = Math.hypot(dx, dy), v = dt * 1.1 * wxSpd;
     if (dd > v) { r.x += dx / dd * v; r.y += dy / dd * v; }
     else {
       r.x = tx; r.y = ty; r.pathIndex++;
@@ -757,7 +1049,7 @@ function save() {
     residents.forEach(r => rs.push([r.id, r.name, r.gender, r.age, r.born, r.familyId, r.houseKey, r.jobKey, r.skill, r.wallet, rd(r.needs), +r.mood.toFixed(1), r.rel.parent, r.rel.spouse, r.rel.children, r.log.slice(-20)]));
     const hhs = [];
     households.forEach(h => hhs.push([h.id, h.homeKey, h.members, +h.wallet.toFixed(1)]));
-    localStorage.setItem(KEY, JSON.stringify({ v: 5, ch, m: S.m, t: S.t, rp: +S.rp.toFixed(1), cam: { x: cam.x, y: cam.y, z: Z }, tool, sel, sp: speed, rs, hhs, nid: nextId, nhid: nextHouseId, bg: Array.from(bridges), stg: townStage, chr: chronicle, ms: milestones }));
+    localStorage.setItem(KEY, JSON.stringify({ v: 5, ch, m: S.m, t: S.t, rp: +S.rp.toFixed(1), cam: { x: cam.x, y: cam.y, z: Z }, tool, sel, sp: speed, rs, hhs, nid: nextId, nhid: nextHouseId, bg: Array.from(bridges), stg: townStage, chr: chronicle, ms: milestones, wx: { sa: seasonAuto, sm: seasonManual, wa: weatherAuto, wi: weatherId, ds: dockSilted, ac: activeChain } }));
   } catch (e) {}
 }
 function load() {
@@ -765,6 +1057,14 @@ function load() {
     const d = JSON.parse(localStorage.getItem(KEY)); if (!d || d.v !== 5) return false;
     chunks.clear(); residents.clear(); households.clear(); activeResidents.clear(); bridges = new Set(d.bg || []);
     townStage = d.stg || 0; chronicle = d.chr || []; milestones = d.ms || {};
+    if (d.wx) {
+      seasonAuto = d.wx.sa !== false;
+      seasonManual = d.wx.sm || 0;
+      weatherAuto = d.wx.wa !== false;
+      weatherId = d.wx.wi || "clear";
+      dockSilted = !!d.wx.ds;
+      activeChain = d.wx.ac || null;
+    }
     for (const k in d.ch) {
       const [cx, cy] = k.split(",").map(Number); const c = getChunk(cx, cy, true);
       d.ch[k].r.forEach(l => c.roads.add(l));
@@ -1062,7 +1362,15 @@ function buy(b, g, qty, dst) {
 }
 function produce(b, T) {
   const r = T.rec;
-  b.prog = Math.min(1.5, (b.prog || 0) + .55);
+  let rateMult = 1.0;
+  if (T.cat === "farm") {
+    const sMult = SEASONS[getCurSeason()].farmMult || 1.0;
+    const wMult = getCurWeather().farmMult || 1.0;
+    const eMult = (activeEvent && activeEvent.farmMult) ? activeEvent.farmMult : 1.0;
+    const cMult = (activeChain && activeChain.farmMult) ? activeChain.farmMult : 1.0;
+    rateMult = sMult * wMult * eMult * cMult;
+  }
+  b.prog = Math.min(1.5, (b.prog || 0) + .55 * rateMult);
   for (const g in r.in) {
     const need = r.in[g] * 3 - (b.in[g] || 0);
     if (need <= 0) continue;
@@ -1155,7 +1463,8 @@ function tick() {
   svcs.forEach(b => { b.st = "營業中"; });
   const gl = ["pottery", "wood", "cloth", "iron", "wine"], gs = (gl.reduce((a, g) => a + sat[g], 0) + ss) / (gl.length + 1);
   const emp = pop > 0 ? Math.min(1, jobs / pop) : 1, pkv = Math.min(1, pk / Math.max(1, pop / 8));
-  const hap = 100 * (.5 * sat.noodle + .2 * gs + .15 * emp + .15 * pkv);
+  const wxMood = (getCurWeather().moodDelta || 0) + ((activeEvent && activeEvent.moodDelta) ? activeEvent.moodDelta : 0) + ((activeChain && activeChain.moodDelta) ? activeChain.moodDelta : 0);
+  const hap = Math.max(0, Math.min(100, 100 * (.5 * sat.noodle + .2 * gs + .15 * emp + .15 * pkv) + wxMood));
   ECO = { food: SUP.noodle || 0, hap: pop > 0 ? ECO.hap * .7 + hap * .3 : 50, pop, jobs, employed, biz, sat };
   evalTownStage();
 }
@@ -1175,7 +1484,70 @@ function step(d) {
     else if (T.cat === "house" && !b.hk) populateHouse(b);
   });
   acc += d; if (acc >= 10) { acc -= 10; tick(); }
-  if (Math.random() < d * 0.15) {
+  // 自然天氣自動輪替
+  if (weatherAuto) {
+    weatherTimer -= d;
+    if (weatherTimer <= 0) {
+      const nextW = rollNaturalWeather(getCurSeason());
+      if (nextW !== weatherId) {
+        weatherId = nextW;
+        const wObj = getCurWeather();
+        say(wObj.icon + " 天氣轉為「" + wObj.name + "」");
+      }
+      weatherTimer = 150 + Math.random() * 180;
+    }
+  }
+  // 雷雨閃電效果
+  if (weatherId === "storm") {
+    nextLightning -= d;
+    if (nextLightning <= 0) {
+      lightningAlpha = 0.65;
+      nextLightning = 7 + Math.random() * 14;
+    }
+  }
+  if (lightningAlpha > 0) lightningAlpha = Math.max(0, lightningAlpha - d * 2.2);
+  // 連續降雨累積判定（觸發河道水患與疏浚事件鏈）
+  if (weatherId === "rain" || weatherId === "storm") {
+    wetAccum += d * (weatherId === "storm" ? 1.6 : 1.0);
+  } else {
+    wetAccum = Math.max(0, wetAccum - d * 0.5);
+  }
+
+  // 連續性因果事件鏈推進與觸發
+  stepEventChain(d);
+  if (!activeChain && residents.size > 0) {
+    if (wetAccum >= 110) {
+      wetAccum = 0;
+      startEventChain("flood_silt");
+    } else {
+      chainCooldown -= d;
+      if (chainCooldown <= 0) {
+        const hasCulture = allBuildings().some(b => b.p >= 1 && ok(b) && (b.t === "s2" || b.t === "s6" || b.t === "p4"));
+        const canFestival = (ECO.food || 0) >= 18 && residents.size >= 4;
+        const candidates = [];
+        if (hasCulture) candidates.push("scholar_visit");
+        if (canFestival) candidates.push("grand_festival");
+        if (candidates.length > 0) {
+          startEventChain(randOf(candidates));
+        } else {
+          chainCooldown = 160;
+        }
+      }
+    }
+  }
+
+  // 單發性隨機事件排程
+  if (activeEvent && S.t >= activeEvent.endT) activeEvent = null;
+  if (residents.size > 0) {
+    eventCooldown -= d;
+    if (eventCooldown <= 0) {
+      triggerSingleEvent();
+      eventCooldown = 220 + Math.random() * 180;
+    }
+  }
+
+  // 碼頭商船過路關稅（若河道淤積則暫停）
+  if (!dockSilted && Math.random() < d * 0.15) {
     S.m += 5 + Math.floor(ECO.pop * 0.5);
   }
   updateActiveSet();
@@ -1321,6 +1693,10 @@ function drawRes(r, ts) {
   cx.fillStyle = "rgba(0,0,0,.22)"; cx.beginPath(); cx.ellipse(x, y, 4, 2, 0, 0, 7); cx.fill();
   cx.fillStyle = SHIRT[r.id % SHIRT.length]; cx.fillRect(x - 2, y - 9 - bob, 4, 7);
   cx.fillStyle = "#e8cfa8"; cx.beginPath(); cx.arc(x, y - 11 - bob, 2.4, 0, 7); cx.fill();
+  if ((weatherId === "rain" || weatherId === "storm") && r.state !== "sleep") {
+    cx.fillStyle = ["#c94f4f", "#3f6f8a", "#d9a441", "#5a7a46"][r.id % 4];
+    cx.beginPath(); cx.arc(x, y - 13 - bob, 5.2, Math.PI, 0); cx.fill();
+  }
   if (r.state === "work") { cx.fillStyle = "#d9a441"; cx.fillRect(x - 1, y - 16 - bob, 2, 2); }
   else if (r.state === "sleep") { cx.fillStyle = "#6e8f9a"; cx.fillRect(x - 1, y - 16 - bob, 2, 2); }
   else if (r.state === "eat") { cx.fillStyle = "#b8452e"; cx.fillRect(x - 1, y - 16 - bob, 2, 2); }
@@ -1344,7 +1720,7 @@ function draw(ts) {
     const x = (s + d) / 2, y = (s - d) / 2; if (!inW(x, y)) continue;
     if (isW(x, y)) { tile(x, y, WC[(((Math.sin(ts / 700 + x * .8 + y * .5) + 1) * 3.5) | 0)]); if (bridges.has(K(x, y))) bridgeTile(x, y); }
     else if (hasRoad(x, y)) tile(x, y, conn.has(K(x, y)) ? "#c9c4b1" : "#bcb7a5", "#9a9582");
-    else { const b = terrainAt(x, y) || "meadow"; const pal = GR[b] || GR.meadow; tile(x, y, pal[hs(x, y) % 3]); }
+    else { const b = terrainAt(x, y) || "meadow"; const curGR = GR_SEASON[getCurSeason()] || GR_SEASON[0]; const pal = curGR[b] || curGR.meadow; tile(x, y, pal[hs(x, y) % 3]); }
   }
   poly([P(RX, DOCK.y + .2), P(RX + .8, DOCK.y + .2), P(RX + .8, DOCK.y + .8), P(RX, DOCK.y + .8)], "#8b6b4b");
   if (hov && tool !== "look" && inW(hov[0], hov[1])) tile(hov[0], hov[1], can(hov[0], hov[1]) ? "rgba(110,220,140,.55)" : "rgba(220,90,70,.55)");
@@ -1359,8 +1735,12 @@ function draw(ts) {
     if (dk > .6 && r.state === "sleep") return;
     it.push([r.x + r.y, () => drawRes(r, ts)]);
   });
+  if (dockSilted) {
+    poly([P(RX, DOCK.y - 1), P(RX + 1.8, DOCK.y - 1), P(RX + 1.8, DOCK.y + 2), P(RX, DOCK.y + 2)], "rgba(162,132,84,0.62)", false);
+  }
+  const boatCnt = dockSilted ? 1 : 5;
   const ty = Math.round(cam.y / HH - RX), st = Math.floor((ty - 50) / 100) * 100;
-  for (let k = 0; k < 5; k++) { const by = st + ((ts / 1000 * .45 + k * 20) % 100), bx = RX + (k % 2 ? .65 : 1.3); if (by > 0 && by < N - 2) it.push([bx + by + .6, () => boat(bx, by, ts)]); }
+  for (let k = 0; k < boatCnt; k++) { const by = st + ((ts / 1000 * (dockSilted ? .15 : .45) + k * 20) % 100), bx = RX + (k % 2 ? .65 : 1.3); if (by > 0 && by < N - 2) it.push([bx + by + .6, () => boat(bx, by, ts)]); }
   it.sort((a, b) => a[0] - b[0]); it.forEach(o => o[1]());
   cx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (dk > 0) {
@@ -1368,6 +1748,71 @@ function draw(ts) {
     cx.setTransform(T0[0], T0[1], T0[2], T0[3], T0[4], T0[5]); cx.globalCompositeOperation = "lighter";
     forEachB(b => { if (b.p < 1 || TY[b.t].cat === "park" || TY[b.t].cat === "farm" || !vis(b.x, b.y)) return; const q = P(b.x + .5, b.y + 1, 10); cx.fillStyle = "rgba(255,176,80," + (.32 * dk) + ")"; cx.beginPath(); cx.arc(q[0], q[1], 13, 0, 7); cx.fill(); });
     cx.globalCompositeOperation = "source-over";
+  }
+  drawWeatherFX(ts);
+}
+
+let lastFxTs = 0;
+function drawWeatherFX(ts) {
+  const fdt = Math.min(0.05, (ts - lastFxTs) / 1000 || 0.016);
+  lastFxTs = ts;
+  const w = weatherId;
+
+  if (w === "rain" || w === "storm") {
+    const isStorm = w === "storm";
+    const count = isStorm ? 150 : 95;
+    const vx = isStorm ? -0.28 : -0.10;
+    const vy = isStorm ? 1.45 : 1.05;
+    cx.strokeStyle = isStorm ? "rgba(195,218,238,0.62)" : "rgba(210,230,245,0.52)";
+    cx.lineWidth = isStorm ? 1.4 : 1.1;
+    cx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const p = wxParticles[i];
+      p.x = (p.x + vx * p.z * fdt + 1) % 1;
+      p.y = (p.y + vy * p.z * fdt) % 1;
+      const sx = p.x * VW;
+      const sy = p.y * VH;
+      const len = (isStorm ? 18 : 13) * p.z;
+      cx.moveTo(sx, sy);
+      cx.lineTo(sx + vx * len * 0.9, sy + len);
+    }
+    cx.stroke();
+    if (isStorm) {
+      cx.fillStyle = "rgba(18,28,42,0.16)";
+      cx.fillRect(0, 0, VW, VH);
+      if (lightningAlpha > 0) {
+        cx.fillStyle = "rgba(240,248,255," + lightningAlpha.toFixed(3) + ")";
+        cx.fillRect(0, 0, VW, VH);
+      }
+    }
+  } else if (w === "snow") {
+    const count = 110;
+    cx.fillStyle = "rgba(255,255,255,0.85)";
+    cx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const p = wxParticles[i];
+      p.y = (p.y + 0.16 * p.z * fdt) % 1;
+      p.x = (p.x + Math.sin(ts / 900 + p.ph) * 0.04 * fdt + 1) % 1;
+      const sx = p.x * VW;
+      const sy = p.y * VH;
+      const rad = 1.6 + p.z * 1.8;
+      cx.moveTo(sx + rad, sy);
+      cx.arc(sx, sy, rad, 0, 6.283);
+    }
+    cx.fill();
+  } else if (w === "fog") {
+    const drift = Math.sin(ts / 2500) * 18;
+    const g = cx.createLinearGradient(0, 0, VW, VH);
+    g.addColorStop(0, "rgba(225,235,232,0.28)");
+    g.addColorStop(0.5, "rgba(215,228,225,0.18)");
+    g.addColorStop(1, "rgba(225,235,232,0.30)");
+    cx.fillStyle = g;
+    cx.fillRect(0, 0, VW, VH);
+    cx.fillStyle = "rgba(235,242,240,0.12)";
+    cx.beginPath();
+    cx.ellipse(VW * 0.35 + drift, VH * 0.42, VW * 0.38, VH * 0.16, 0, 0, 6.283);
+    cx.ellipse(VW * 0.72 - drift, VH * 0.68, VW * 0.35, VH * 0.15, 0, 0, 6.283);
+    cx.fill();
   }
 }
 
@@ -1477,7 +1922,9 @@ function hud() {
   $("#clk").textContent = "第" + (Math.floor(S.t / 360) + 1) + "日 " + pad(hh) + ":" + pad(mm) + "・" + SH[Math.floor(((hh + 1) % 24) / 2)] + "時" + (dark(h) > .5 ? "・夜" : "");
   if (ecoOpen) renderEco();
   if (chronOpen) renderChronicle();
+  updateWxBadge();
   if (stageOpen) renderStageModal();
+  if (wxOpen) renderWxModal();
   if (debugOpen) renderDebug();
   if (resCardR) { if (!residents.has(resCardR.id)) { $("#resCard").style.display = "none"; resCardR = null; } else showResident(resCardR); }
 }
@@ -1487,6 +1934,7 @@ function closeAllModals() {
   rosterOpen = false; $("#roster").style.display = "none";
   chronOpen = false; $("#chron").style.display = "none";
   stageOpen = false; $("#stageModal").style.display = "none";
+  wxOpen = false; $("#wxModal").style.display = "none";
   resCardR = null; $("#resCard").style.display = "none";
   hideCard();
 }
@@ -1650,6 +2098,74 @@ function renderStageModal() {
 
 $("#stageBadge").onclick = () => { closeAllModals(); stageOpen = true; $("#stageModal").style.display = "flex"; renderStageModal(); };
 $("#stageX").onclick = () => { stageOpen = false; $("#stageModal").style.display = "none"; };
+
+
+function renderWxModal() {
+  const curS = getCurSeason();
+  const sObj = SEASONS[curS];
+  const wObj = getCurWeather();
+
+  const seasonBtns = ['<button class="wx-opt' + (seasonAuto ? ' on' : '') + '" data-sa="1">自動輪替</button>']
+    .concat(SEASONS.map(s => '<button class="wx-opt' + (!seasonAuto && seasonManual === s.id ? ' on' : '') + '" data-sm="' + s.id + '">' + s.full + '</button>'))
+    .join("");
+
+  const wxBtns = ['<button class="wx-opt' + (weatherAuto ? ' on' : '') + '" data-wa="1">自動變化</button>']
+    .concat(WEATHERS.map(w => '<button class="wx-opt' + (!weatherAuto && weatherId === w.id ? ' on' : '') + '" data-wi="' + w.id + '">' + w.icon + ' ' + w.name + '</button>'))
+    .join("");
+
+  let chainHtml = '<span>目前無進行中的連續事件鏈（連日降雨、文風或豐收將自然觸發）</span>';
+  if (activeChain && EVENT_CHAINS[activeChain.id]) {
+    const def = EVENT_CHAINS[activeChain.id];
+    const pills = def.steps.map((stName, idx) => {
+      const cls = idx < activeChain.step ? "ev-step done" : idx === activeChain.step ? "ev-step cur" : "ev-step";
+      return '<span class="' + cls + '">' + (idx + 1) + '.' + stName + '</span>';
+    }).join("");
+    chainHtml = '<div><b>連續事件鏈：' + def.title + '</b>（本階段剩餘 ' + Math.max(1, Math.ceil(activeChain.timer)) + ' 秒）</div><div class="ev-steps">' + pills + '</div>';
+  }
+
+  const singleHtml = activeEvent
+    ? '<span class="stg-ok">進行中：' + activeEvent.name + '（剩餘 ' + Math.max(1, Math.ceil(activeEvent.endT - S.t)) + ' 秒）</span>'
+    : '<span>暫無單發事件（外地商隊、糧商急購、巧匠過境等隨機發生）</span>';
+
+  $("#wxBody").innerHTML =
+    '<div class="stg-box"><div>當前時節：<b>' + sObj.full + '</b>（' + (seasonAuto ? '每 ' + seasonDays + ' 日自動更迭' : '手動鎖定') + '）— ' + sObj.desc + '</div>' +
+    '<div>當前天象：<b>' + wObj.icon + ' ' + wObj.name + '</b>（' + (weatherAuto ? '隨季節自然變換' : '手動鎖定') + '）— ' + wObj.desc + '</div>' +
+    (dockSilted ? '<div class="stg-lack">⚠️ 河道目前處於淤積狀態，商船減班、市舶關稅暫停。</div>' : '') + '</div>' +
+    '<div><b>季節設定</b>（影響地表景觀與農田產速）</div>' +
+    '<div class="wx-grid5">' + seasonBtns + '</div>' +
+    '<div><b>天氣設定</b>（共 6 種天象，含視覺粒子與生態影響）</div>' +
+    '<div class="wx-grid">' + wxBtns + '</div>' +
+    '<div class="ev-chain">' + chainHtml + '</div>' +
+    '<div class="wx-row"><div><b>單發性事件</b><br><small>' + singleHtml + '</small></div></div>';
+}
+
+$("#wxBody").addEventListener("click", e => {
+  const btn = e.target.closest(".wx-opt");
+  if (!btn) return;
+  if (btn.dataset.sa) {
+    seasonAuto = true;
+    say("季節已切換為「自動輪替」");
+  } else if (btn.dataset.sm != null) {
+    seasonAuto = false;
+    seasonManual = Number(btn.dataset.sm);
+    say("季節已鎖定為「" + SEASONS[seasonManual].full + "」");
+  } else if (btn.dataset.wa) {
+    weatherAuto = true;
+    weatherTimer = 60;
+    say("天氣已切換為「自動變化」");
+  } else if (btn.dataset.wi) {
+    weatherAuto = false;
+    weatherId = btn.dataset.wi;
+    const wObj = getCurWeather();
+    say(wObj.icon + " 天氣已切換為「" + wObj.name + "」");
+  }
+  updateWxBadge();
+  renderWxModal();
+  dirty();
+});
+
+$("#wxBadge").onclick = () => { closeAllModals(); wxOpen = true; $("#wxModal").style.display = "flex"; renderWxModal(); };
+$("#wxX").onclick = () => { wxOpen = false; $("#wxModal").style.display = "none"; };
 
 $("#bChron").onclick = () => { closeAllModals(); chronOpen = true; $("#chron").style.display = "flex"; renderChronicle(); };
 $("#chronX").onclick = () => { chronOpen = false; $("#chron").style.display = "none"; };
