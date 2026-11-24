@@ -119,19 +119,20 @@ const WC = []; for (let i = 0; i < 8; i++) WC.push("hsl(197 42% " + (47 + i * .9
 
 const VIEW_AI_FULL = 800;
 const VIEW_AI_MID = 2000;
+const RESERVE_CASH = 20; // 居民基本儲蓄保護線（避免變日光族）
 
 // ============================================================
-// 1. 商品與建築資料
+// 1. 商品與建築資料（提升糧食產線產量，讓小鎮能穩定囤糧）
 // ============================================================
 const GD = {
-  wheat: { n: "小麥", p: 2 }, flour: { n: "麵粉", p: 4 }, noodle: { n: "麵食", p: 6, need: 3 },
-  pottery: { n: "陶器", p: 10, need: .6 }, wood: { n: "木器", p: 12, need: .6 }, cloth: { n: "布匹", p: 11, need: .5 },
-  iron: { n: "鐵器", p: 15, need: .2 }, wine: { n: "酒", p: 13, need: .8 }
+  wheat: { n: "小麥", p: 2 }, flour: { n: "麵粉", p: 4 }, noodle: { n: "麵食", p: 6, need: 2.2 },
+  pottery: { n: "陶器", p: 10, need: .5 }, wood: { n: "木器", p: 12, need: .5 }, cloth: { n: "布匹", p: 11, need: .45 },
+  iron: { n: "鐵器", p: 15, need: .2 }, wine: { n: "酒", p: 13, need: .6 }
 };
 const CAT = {
   house: [{ id: "h1", n: "民居", c: 80, h: 20, r: 13, w: ["#ece1c8", "#cdc0a1"], f: ["#7a928d", "#566b68", "#8aa39e"] }],
   bridge: [{ id: "b1", n: "大橋", c: 80 }, { id: "b2", n: "小橋", c: 40 }],
-  farm: [{ id: "f1", n: "麥田", c: 100, jobs: 2, bt: 12, rec: { in: {}, out: { wheat: 4 } } }],
+  farm: [{ id: "f1", n: "麥田", c: 100, jobs: 2, bt: 12, rec: { in: {}, out: { wheat: 6 } } }],
   shop: [
     { id: "s1", n: "雜貨鋪", c: 120, h: 24, r: 14, w: ["#dbb88f", "#b99671"], f: ["#d1604a", "#a23f2b", "#e07a63"], d: "lan", jobs: 3, sell: ["pottery", "wood", "iron"] },
     { id: "s2", n: "茶坊", c: 140, h: 24, r: 14, w: ["#d9c9a0", "#b8a77d"], f: ["#4f7b6b", "#3a5c50", "#62917f"], d: "flag", jobs: 3, svc: 1 },
@@ -139,7 +140,7 @@ const CAT = {
     { id: "s4", n: "布莊", c: 150, h: 24, r: 13, w: ["#e8dcc8", "#c9bb9f"], f: ["#3e5f8a", "#2f4a6c", "#5276a3"], d: "cloth", jobs: 3, sell: ["cloth"] },
     { id: "s5", n: "藥鋪", c: 170, h: 24, r: 14, w: ["#d8cdb3", "#b7ab8f"], f: ["#6a7f4f", "#52643c", "#7f9663"], d: "sign", jobs: 3, svc: 1 },
     { id: "s6", n: "酒樓", c: 260, h: 38, r: 16, w: ["#e2b58c", "#bf9168"], f: ["#b8452e", "#8f3320", "#cf5c43"], d: "lan2", jobs: 4, bt: 30, sell: ["wine"] },
-    { id: "s7", n: "麵食店", c: 170, h: 24, r: 14, w: ["#e6d3ae", "#c4b088"], f: ["#b0733a", "#8a5a2c", "#c98a4e"], d: "lan", jobs: 3, sell: ["noodle"], rec: { in: { flour: 4 }, out: { noodle: 8 } } }
+    { id: "s7", n: "麵食店", c: 170, h: 24, r: 14, w: ["#e6d3ae", "#c4b088"], f: ["#b0733a", "#8a5a2c", "#c98a4e"], d: "lan", jobs: 3, sell: ["noodle"], rec: { in: { flour: 4 }, out: { noodle: 12 } } }
   ],
   work: [
     { id: "w1", n: "陶坊", c: 150, h: 22, r: 11, w: ["#bf9f7e", "#9c7f61"], f: ["#8a6650", "#684a38", "#9c7863"], d: "kiln", jobs: 3, rec: { in: {}, out: { pottery: 2 } } },
@@ -147,7 +148,7 @@ const CAT = {
     { id: "w3", n: "織坊", c: 170, h: 22, r: 12, w: ["#e0d2b6", "#bfb094"], f: ["#8a5f7a", "#6c4960", "#a0768f"], d: "yarn", jobs: 3, rec: { in: {}, out: { cloth: 2 } } },
     { id: "w4", n: "鐵鋪", c: 200, h: 22, r: 11, w: ["#a9a49a", "#878279"], f: ["#5b5f66", "#44474d", "#6e737b"], d: "anvil", jobs: 3, rec: { in: {}, out: { iron: 1 } } },
     { id: "w5", n: "釀酒坊", c: 220, h: 24, r: 12, w: ["#d3b891", "#b09670"], f: ["#7b5b3e", "#5e432d", "#8f6e4f"], d: "jars", jobs: 3, rec: { in: { wheat: 2 }, out: { wine: 2 } } },
-    { id: "w6", n: "磨坊", c: 180, h: 26, r: 12, w: ["#cfc2a6", "#aea286"], f: ["#6a6a5a", "#4f4f43", "#80806f"], d: "mill", jobs: 3, rec: { in: { wheat: 4 }, out: { flour: 4 } } }
+    { id: "w6", n: "磨坊", c: 180, h: 26, r: 12, w: ["#cfc2a6", "#aea286"], f: ["#6a6a5a", "#4f4f43", "#80806f"], d: "mill", jobs: 3, rec: { in: { wheat: 4 }, out: { flour: 6 } } }
   ],
   park: [
     { id: "p1", n: "垂柳", c: 60, k: "willow", bt: 6 }, { id: "p2", n: "花圃", c: 50, k: "flower", bt: 6 },
@@ -157,7 +158,7 @@ const CAT = {
 };
 const TY = {}; Object.keys(CAT).forEach(c => CAT[c].forEach(v => { v.cat = c; TY[v.id] = v; }));
 const TOOLS = [["look", "探索"], ["road", "鋪路"], ["bridge", "橋樑"], ["house", "民居"], ["farm", "農田"], ["shop", "商鋪"], ["work", "作坊"], ["park", "園景"], ["del", "拆除"]];
-const ROAD = 20;
+const ROAD = 15;
 
 // ============================================================
 // 2. 區塊化世界
@@ -214,7 +215,7 @@ function genChunk(cx, cy) {
 function terrainAt(x, y) { if (x < 0 || y < 0 || x >= N || y >= N) return "meadow"; const [cx, cy] = cOf(x, y); const c = getChunk(cx, cy, false); if (!c || !c.terrain) return null; return BIOME_KEYS[c.terrain.tiles[(((y % CH) + CH) % CH) * CH + (((x % CH) + CH) % CH)]]; }
 
 // ============================================================
-// 4. 連通（修 #6：只認西岸 RX-1，河東必須靠橋）
+// 4. 連通（只認西岸 RX-1，河東必須靠橋）
 // ============================================================
 let conn = new Set(), CR = [];
 function calcConn() {
@@ -283,9 +284,9 @@ function mkResident(opts) {
     id, name: opts.name || genName(gender), gender, age, born: S.t - age * 360,
     familyId: opts.familyId || null, houseKey: opts.houseKey || null,
     jobKey: null, jobT: 0, skill: 0,
-    wallet: opts.wallet != null ? opts.wallet : 20 + Math.random() * 60 | 0,
-    needs: { hun: 60 + Math.random() * 40, fat: 60 + Math.random() * 40, joy: 50 + Math.random() * 50, soc: 50 + Math.random() * 50 },
-    mood: 60 + Math.random() * 30,
+    wallet: opts.wallet != null ? opts.wallet : 45 + Math.random() * 55 | 0,
+    needs: { hun: 65 + Math.random() * 35, fat: 65 + Math.random() * 35, joy: 55 + Math.random() * 45, soc: 55 + Math.random() * 45 },
+    mood: 65 + Math.random() * 25,
     rel: { parent: opts.parent || null, spouse: null, children: [] },
     log: [], x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, state: "idle", timer: 0, target: null, path: null, pathIndex: 0, afterMove: "idle", phase: 0
   };
@@ -305,22 +306,39 @@ function placeResidentAtHome(r, b, index) {
   r.x = b.x + spot[0];
   r.y = b.y + spot[1];
 }
-// 修 #1：houseKey 用 K(b.x,b.y)
 function populateHouse(b) {
   if (!b.hk) { b.hk = mkHousehold(K(b.x, b.y)); }
   const hh = households.get(b.hk); if (!hh) return;
   if (hh.members.length > 0) return;
   const male = Math.random() < .5;
-  const a = mkResident({ gender: male ? "m" : "f", age: 20 + Math.random() * 15 | 0, familyId: hh.id, houseKey: K(b.x, b.y), wallet: 60 + Math.random() * 80 | 0 });
-  const bb = mkResident({ gender: male ? "f" : "m", age: 18 + Math.random() * 15 | 0, familyId: hh.id, houseKey: K(b.x, b.y), wallet: 40 + Math.random() * 60 | 0 });
+  const a = mkResident({ gender: male ? "m" : "f", age: 20 + Math.random() * 15 | 0, familyId: hh.id, houseKey: K(b.x, b.y), wallet: 80 + Math.random() * 70 | 0 });
+  const bb = mkResident({ gender: male ? "f" : "m", age: 18 + Math.random() * 15 | 0, familyId: hh.id, houseKey: K(b.x, b.y), wallet: 65 + Math.random() * 60 | 0 });
   a.rel.spouse = bb.id; bb.rel.spouse = a.id;
   hh.members.push(a.id, bb.id);
   placeResidentAtHome(a, b, 0);
   placeResidentAtHome(bb, b, 1);
   b.workers = b.workers || [];
-  // 修 #2 & #4：遷入同步居民財產池
   syncRp();
 }
+
+// 每日穩定稅收（戶稅＋營業稅＋田賦）
+function collectDailyTax() {
+  let taxTotal = 0;
+  forEachB(b => {
+    if (b.p < 1 || !ok(b)) return;
+    const T = TY[b.t];
+    if (T.cat === "house") {
+      const hh = b.hk ? households.get(b.hk) : null;
+      if (hh && hh.members.length > 0) taxTotal += 15;
+    } else if (T.cat === "shop" || T.cat === "work") {
+      taxTotal += 25;
+    } else if (T.cat === "farm") {
+      taxTotal += 12;
+    }
+  });
+  if (taxTotal > 0) S.m += taxTotal;
+}
+
 function bgDay() {
   const day = Math.floor(S.t / 360);
   const all = Array.from(residents.values());
@@ -329,23 +347,35 @@ function bgDay() {
     const r = all[i];
     if (S.t - r.born > (r.age + 1) * 360) { r.age++; if (r.age === 18) r.log.push("第" + (day + 1) + "日 成年"); }
     if (r.age > 60 + Math.random() * 30) { killResident(r, "年老"); continue; }
-    r.needs.hun -= 6; r.needs.fat -= 4; r.needs.joy -= 2; r.needs.soc -= 2;
-    if (r.needs.hun < 20 && Math.random() < .5) r.mood -= 5;
+    r.needs.hun -= 4; r.needs.fat -= 3; r.needs.joy -= 2; r.needs.soc -= 2;
+    if (r.needs.hun < 20 && Math.random() < .5) r.mood -= 4;
     if (!r.jobKey) {
       const opened = jobCache.filter(b => (b.workers || []).length < (TY[b.t].jobs || 0));
-      if (opened.length && Math.random() < .3) {
+      if (opened.length && Math.random() < .45) {
         const j = randOf(opened);
         j.workers = j.workers || [];
         if (j.workers.length < (TY[j.t].jobs || 0)) {
-          j.workers.push(r.id); r.jobKey = K(j.x, j.y);   // 修 #1
+          j.workers.push(r.id); r.jobKey = K(j.x, j.y);
           r.log.push("第" + (day + 1) + "日 在" + TY[j.t].n + "工作");
         }
+      }
+    } else {
+      // 有工作的居民每日領取穩定底薪（告別日光族）
+      const jb = bm.get(r.jobKey);
+      if (jb && ok(jb)) {
+        const basePay = 12 + Math.floor((r.skill || 0) / 10);
+        const fromBiz = Math.min(Math.max(0, jb.cash || 0), basePay);
+        jb.cash = Math.max(0, (jb.cash || 0) - fromBiz);
+        r.wallet = (r.wallet || 0) + basePay;
+        r.skill = Math.min(100, (r.skill || 0) + 0.8);
+      } else {
+        r.jobKey = null;
       }
     }
     if (r.rel.spouse && r.age >= 20 && r.age <= 40 && Math.random() < .02) {
       const hh = households.get(r.familyId);
       if (hh && hh.members.length < 4) {
-        const child = mkResident({ age: 0, familyId: hh.id, houseKey: r.houseKey, parent: r.id, wallet: 0, gender: Math.random() < .5 ? "m" : "f" });
+        const child = mkResident({ age: 0, familyId: hh.id, houseKey: r.houseKey, parent: r.id, wallet: 10, gender: Math.random() < .5 ? "m" : "f" });
         hh.members.push(child.id);
         const home = r.houseKey != null ? bm.get(r.houseKey) : null;
         placeResidentAtHome(child, home, hh.members.length - 1);
@@ -357,12 +387,11 @@ function bgDay() {
     }
     if (r.mood < 20 && !r.jobKey && Math.random() < .01) { leaveResident(r, "遷出"); }
   }
-  // 修 #5：空民居完整遷入與成年子女分戶機制
+  // 空民居完整遷入與成年子女分戶機制
   const vacant = allBuildings().filter(b => TY[b.t].cat === "house" && b.p >= 1 && ok(b) && (!b.hk || !households.get(b.hk) || households.get(b.hk).members.length === 0));
   const homeless = all.filter(r => residents.has(r.id) && (r.houseKey == null || !bm.get(r.houseKey)));
   const grownKids = all.filter(r => residents.has(r.id) && r.age >= 18 && r.rel.parent != null && !r.rel.spouse && r.houseKey != null);
   vacant.forEach(b => {
-    // 1) 優先安置無家可歸者
     if (homeless.length >= 2) {
       const a = homeless.shift(), bb = homeless.shift();
       if (!b.hk) b.hk = mkHousehold(K(b.x, b.y));
@@ -375,7 +404,6 @@ function bgDay() {
       a.log.push("第" + (day + 1) + "日 搬入新居"); bb.log.push("第" + (day + 1) + "日 搬入新居");
       return;
     }
-    // 2) 成年子女結婚分戶成家
     if (grownKids.length > 0 && Math.random() < .35) {
       const kid = grownKids.shift();
       const oldHh = households.get(kid.familyId);
@@ -390,7 +418,7 @@ function bgDay() {
         age: Math.max(18, kid.age + ((Math.random() * 5 | 0) - 2)),
         familyId: hh.id,
         houseKey: K(b.x, b.y),
-        wallet: 50 + Math.random() * 70 | 0
+        wallet: 60 + Math.random() * 60 | 0
       });
       kid.familyId = hh.id;
       kid.houseKey = K(b.x, b.y);
@@ -401,15 +429,14 @@ function bgDay() {
       placeResidentAtHome(partner, b, 1);
       kid.log.push("第" + (day + 1) + "日 與" + partner.name + "成家分戶");
       partner.log.push("第" + (day + 1) + "日 與" + kid.name + "成家入住");
-      syncRp();
       return;
     }
-    // 3) 外來新家庭遷入空屋（幸福度越高越容易吸引移民）
     const attractProb = ECO.hap >= 55 ? .45 : ECO.hap >= 35 ? .25 : .12;
     if (Math.random() < attractProb) {
       populateHouse(b);
     }
   });
+  syncRp();
 }
 function killResident(r, why) {
   const hh = households.get(r.familyId);
@@ -490,16 +517,17 @@ function startTravel(r, targetBuilding, fallbackRoad, after) {
 function arrive(r) {
   r.path = null; r.pathIndex = 0; r.target = null;
   r.state = r.afterMove || "idle";
-  if (r.state === "sleep") { r.needs.fat = Math.min(100, r.needs.fat + 50); r.mood = Math.min(100, r.mood + 2); r.timer = 3; }
+  if (r.state === "sleep") { r.needs.fat = Math.min(100, r.needs.fat + 55); r.mood = Math.min(100, r.mood + 2); r.timer = 3; }
   else if (r.state === "work") {
-    r.needs.fat = Math.max(0, r.needs.fat - 10);
-    r.needs.joy = Math.max(0, r.needs.joy - 2);
-    r.skill = Math.min(100, (r.skill || 0) + 0.5);
+    r.needs.fat = Math.max(0, r.needs.fat - 8);
+    r.needs.joy = Math.max(0, r.needs.joy - 1.5);
+    r.skill = Math.min(100, (r.skill || 0) + 0.6);
     const jb = r.jobKey != null ? bm.get(r.jobKey) : null;
-    if (jb && (jb.cash || 0) >= 2) {
-      const bonus = Math.min(jb.cash, 2 + Math.floor((r.skill || 0) / 25));
-      jb.cash -= bonus;
-      r.wallet = (r.wallet || 0) + bonus;
+    if (jb) {
+      const wage = 5 + Math.floor((r.skill || 0) / 15);
+      const fromBiz = Math.min(Math.max(0, jb.cash || 0), wage);
+      jb.cash = Math.max(0, (jb.cash || 0) - fromBiz);
+      r.wallet = (r.wallet || 0) + wage;
       syncRp();
     }
     r.timer = 4;
@@ -508,10 +536,10 @@ function arrive(r) {
   else { r.timer = 1 + Math.random() * 2; }
 }
 function aiStep(r, dt) {
-  r.needs.hun = Math.max(0, r.needs.hun - dt * .6);
-  r.needs.fat = Math.max(0, r.needs.fat - dt * .4);
-  r.needs.joy = Math.max(0, r.needs.joy - dt * .2);
-  r.needs.soc = Math.max(0, r.needs.soc - dt * .2);
+  r.needs.hun = Math.max(0, r.needs.hun - dt * .35);
+  r.needs.fat = Math.max(0, r.needs.fat - dt * .35);
+  r.needs.joy = Math.max(0, r.needs.joy - dt * .18);
+  r.needs.soc = Math.max(0, r.needs.soc - dt * .18);
   if (r.state === "move" && r.path && r.path.length) {
     const node = r.path[r.pathIndex], tx = node[0] + .5, ty = node[1] + .5;
     const dx = tx - r.x, dy = ty - r.y, dd = Math.hypot(dx, dy), v = dt * 1.1;
@@ -527,12 +555,14 @@ function aiStep(r, dt) {
 }
 function decide(r) {
   const hour = hr();
-  if (r.needs.hun < 30) {
-    r.state = "eat"; r.needs.hun = Math.min(100, r.needs.hun + 40);
-    const cost = 2;
-    if (r.wallet >= cost) { r.wallet -= cost; syncRp(); }
-    else { r.mood = Math.max(0, r.mood - 5); }
-    r.mood = Math.min(100, r.mood + 3); r.timer = 2; return;
+  if (r.needs.hun < 25) {
+    r.state = "eat"; r.needs.hun = Math.min(100, r.needs.hun + 45);
+    // 保留基本備用金：餘裕時花 2 景元吃好料，緊縮時只花 1 景元吃簡餐
+    const spendable = Math.max(0, (r.wallet || 0) - RESERVE_CASH);
+    if (spendable >= 2) { r.wallet -= 2; syncRp(); r.mood = Math.min(100, r.mood + 3); }
+    else if ((r.wallet || 0) >= 1) { r.wallet -= 1; syncRp(); r.mood = Math.min(100, r.mood + 1); }
+    else { r.mood = Math.max(0, r.mood - 3); }
+    r.timer = 2; return;
   }
   if (r.needs.fat < 30 || hour < 6 || hour >= 23) {
     const hb = r.houseKey != null ? bm.get(r.houseKey) : null;
@@ -634,6 +664,7 @@ function load() {
       if (hb) placeResidentAtHome(r, hb, idx);
       else { r.x = DOCK.x - 1 + Math.random() * 2; r.y = DOCK.y - 1 + Math.random() * 2; }
     });
+    syncRp();
     return true;
   } catch (e) { console.warn(e); return false; }
 }
@@ -660,10 +691,10 @@ function migrateV4() {
       const idx = hh ? Math.max(0, hh.members.indexOf(r.id)) : 0;
       if (hb) placeResidentAtHome(r, hb, idx);
     });
+    syncRp();
     return true;
   } catch (e) { return false; }
 }
-// 修 #10：鏈式遷移 v3 → v4
 function migrateV3() {
   try {
     const d = JSON.parse(localStorage.getItem("town_save_v3")); if (!d || d.v !== 3) return false;
@@ -676,12 +707,10 @@ function migrateV3() {
     S = { m: d.m || 2400, t: d.t || 120, rp: d.rp || 0 };
     if (d.cam) { cam.x = d.cam.x; cam.y = d.cam.y; Z = d.cam.z || Z; }
     if (d.sel) sel = Object.assign(sel, d.sel); if (d.tool) tool = d.tool;
-    // 為現有民居生成住戶（用 K 修 #1）
     forEachB(b => { if (TY[b.t].cat === "house" && b.p >= 1) populateHouse(b); });
     return true;
   } catch (e) { return false; }
 }
-// 修 #10：鏈式遷移 v2 → v3
 function migrateV2() {
   try {
     const d = JSON.parse(localStorage.getItem("town_save_v2")); if (!d || d.v !== 2) return false;
@@ -714,11 +743,9 @@ function showCard(b) {
   $("#cardT").textContent = t; $("#cardDel").textContent = "移除（退還 " + b.c + " 文）"; $("#card").style.display = "flex";
 }
 function hideCard() { cardB = null; $("#card").style.display = "none"; }
-// 修 #3：先複製再遍歷
 function removeB(b) {
   const T = TY[b.t], back = b.c + (b.br ? 40 : 0);
-  S.m += back; delB(b.x, b.y); if (T.k === "pavilion" || b.br) { delRoad(b.x, b.y); calcConn();
-if (residents.size > 0) syncRp(); }
+  S.m += back; delB(b.x, b.y); if (T.k === "pavilion" || b.br) { delRoad(b.x, b.y); calcConn(); if (residents.size > 0) syncRp(); }
   if (b.hk) {
     const hh = households.get(b.hk);
     if (hh) {
@@ -786,7 +813,8 @@ function act(x, y) {
     const share = (T.c * .4) / residents.size;
     residents.forEach(r => { r.wallet = (r.wallet || 0) + share; });
     syncRp();
-  } setB(x, y, { t: T.id, x, y, p: 0, r: 0, c: T.c, cash: Math.round(T.c * .3), in: {}, out: {}, prog: 0, workers: [] });
+  }
+  setB(x, y, { t: T.id, x, y, p: 0, r: 0, c: T.c, cash: Math.round(T.c * .4), in: {}, out: {}, prog: 0, workers: [] });
   if (T.k === "pavilion") { addRoad(x, y); calcConn(); } dirty();
 }
 function can(x, y) {
@@ -820,10 +848,10 @@ TOOLS.forEach(t => {
 });
 
 // ============================================================
-// 9. 經濟模擬
+// 9. 經濟模擬（平衡儲蓄、安全糧食庫存、穩定稅收）
 // ============================================================
-const ens = b => { if (!b.out) b.out = {}; if (!b.in) b.in = {}; if (b.cash == null) b.cash = Math.round(b.c * .3); if (!b.workers) b.workers = []; };
-function mp(g) { const T = GD[g], s = SUP[g] || 0, tg = TGT[g] || 12; return Math.max(.5 * T.p, Math.min(2 * T.p, T.p * (1.8 - .8 * s / tg))); }
+const ens = b => { if (!b.out) b.out = {}; if (!b.in) b.in = {}; if (b.cash == null) b.cash = Math.round(b.c * .4); if (!b.workers) b.workers = []; };
+function mp(g) { const T = GD[g], s = SUP[g] || 0, tg = TGT[g] || 16; return Math.max(.5 * T.p, Math.min(2 * T.p, T.p * (1.8 - .8 * s / tg))); }
 function payWorkers(b, wage) {
   if (wage <= 0) return 0;
   const ws = (b.workers || []).map(id => residents.get(id)).filter(Boolean);
@@ -839,7 +867,7 @@ function payWorkers(b, wage) {
   return 0;
 }
 function income(s, pay, rate) {
-  const tax = pay * rate, wage = pay * .3;
+  const tax = pay * rate, wage = pay * .35;
   s.cash += pay - tax - wage;
   S.m += tax;
   const paid = payWorkers(s, wage);
@@ -850,12 +878,29 @@ function syncRp() {
   residents.forEach(r => { sum += Math.max(0, r.wallet || 0); });
   S.rp = sum;
 }
+// 計算居民超出「基本儲蓄線」的可支配金額總和，避免每次買東西把全鎮抽成日光族
+function disposableRp() {
+  let sum = 0;
+  residents.forEach(r => { sum += Math.max(0, (r.wallet || 0) - RESERVE_CASH); });
+  return sum;
+}
+function spendDisposable(amount) {
+  const disp = disposableRp();
+  if (disp <= 0 || amount <= 0) return 0;
+  const actual = Math.min(amount, disp * 0.25); // 單次採買最多花可支配餘額的 25%
+  const ratio = actual / disp;
+  residents.forEach(r => {
+    const d = Math.max(0, (r.wallet || 0) - RESERVE_CASH);
+    if (d > 0) r.wallet -= d * ratio;
+  });
+  syncRp();
+  return actual;
+}
 function scan(bl) { SUP = {}; SL = {}; bl.forEach(b => { for (const g in b.out) if (b.out[g] > 0) { SUP[g] = (SUP[g] || 0) + b.out[g]; if (TY[b.t].cat !== "shop") (SL[g] = SL[g] || []).push(b); } }); }
-// 修 #8：補貼總上限
 function buy(b, g, qty, dst) {
   const pr = mp(g);
   const isInput = dst === b.in;
-  const subsidyCap = Math.max(20, (b.c || 0) * .5);
+  const subsidyCap = Math.max(25, (b.c || 0) * .5);
   const subsidyLeft = isInput ? Math.max(0, subsidyCap - (b.subsidyUsed || 0)) : 0;
   const budgetLeft = Math.max(0, (S.subsidyBudget || 0) - (S.subsidyUsedGlobal || 0));
   const available = Math.max(0, b.cash || 0) + Math.min(budgetLeft, subsidyLeft);
@@ -876,7 +921,7 @@ function buy(b, g, qty, dst) {
       S.subsidyUsedGlobal = (S.subsidyUsedGlobal || 0) + fromTreasury;
     }
     const actualCost = fromBusiness + fromTreasury;
-    supplier.out[g] -= amount; income(supplier, actualCost, .05); got += amount;
+    supplier.out[g] -= amount; income(supplier, actualCost, .08); got += amount;
     if (got >= qty) break;
   }
   if (got) dst[g] = (dst[g] || 0) + got;
@@ -884,9 +929,9 @@ function buy(b, g, qty, dst) {
 }
 function produce(b, T) {
   const r = T.rec;
-  b.prog = Math.min(1.5, (b.prog || 0) + .5);
+  b.prog = Math.min(1.5, (b.prog || 0) + .55);
   for (const g in r.in) {
-    const need = r.in[g] * 2 - (b.in[g] || 0);
+    const need = r.in[g] * 3 - (b.in[g] || 0);
     if (need <= 0) continue;
     const price = mp(g);
     if ((b.cash || 0) < price * need) {
@@ -909,7 +954,7 @@ function produce(b, T) {
     b.st = allAffordable ? "缺料" : "缺料／資金不足";
     return;
   }
-  if (!Object.keys(r.out).every(g => (b.out[g] || 0) + r.out[g] <= 24)) { b.st = "滿倉"; return; }
+  if (!Object.keys(r.out).every(g => (b.out[g] || 0) + r.out[g] <= 40)) { b.st = "滿倉"; return; }
   b.prog -= 1;
   for (const g in r.in) b.in[g] -= r.in[g];
   for (const g in r.out) b.out[g] = (b.out[g] || 0) + r.out[g];
@@ -917,41 +962,62 @@ function produce(b, T) {
 }
 function tick() {
   forEachB(b => { b.subsidyUsed = 0; });
-  // 修 #8：每 tick 重設補貼上限
   S.subsidyBudget = Math.max(0, S.m * 0.1);
   S.subsidyUsedGlobal = 0;
   const bl = []; forEachB(b => { if (b.p >= 1 && ok(b)) { ens(b); bl.push(b); } });
   let pop = residents.size, jobs = 0, pk = 0, biz = 0;
   bl.forEach(b => { const T = TY[b.t]; if (T.cat === "house") { if (b.p >= 1 && !b.hk) populateHouse(b); } else if (T.cat === "park") pk++; else { jobs += T.jobs || 3; biz += b.cash; } });
-  TGT = { wheat: 20, flour: 16 }; Object.keys(GD).forEach(g => { if (GD[g].need) TGT[g] = Math.max(8, pop * GD[g].need * .5); });
+  TGT = { wheat: 24, flour: 20 }; Object.keys(GD).forEach(g => { if (GD[g].need) TGT[g] = Math.max(10, pop * GD[g].need * .6); });
   scan(bl);
   bl.forEach(b => { const T = TY[b.t]; if (T.rec) produce(b, T); });
   scan(bl);
   const shops = bl.filter(b => TY[b.t].sell);
-  shops.forEach(b => { const T = TY[b.t]; T.sell.forEach(g => { if (T.rec && T.rec.out[g]) return; const want = 12 - (b.out[g] || 0); if (want > 0) buy(b, g, want, b.out); }); });
+  shops.forEach(b => { const T = TY[b.t]; T.sell.forEach(g => { if (T.rec && T.rec.out[g]) return; const want = 24 - (b.out[g] || 0); if (want > 0) buy(b, g, want, b.out); }); });
   scan(bl);
   const sat = {};
   Object.keys(GD).forEach(g => {
     const need = GD[g].need; if (!need) return;
-    const want = pop * need / 36, rp = mp(g) * 1.35; let left = want;
+    // 放緩單次消耗速度（/54），並為麵食保留 25% 隔夜緩衝庫存
+    const want = pop * need / 54, rp = mp(g) * 1.35; let left = want;
+    const isUrgentFood = g === "noodle" && (ECO.sat.noodle != null && ECO.sat.noodle < 0.55);
     if (want > 0) for (const s of shops) {
-      if (left <= 0) break; const a = s.out[g] || 0; if (a <= 0) continue;
-      syncRp();
-      const affordable = Math.min(left, a, Math.max(0, S.rp) / rp);
+      if (left <= 0) break;
+      const stock = s.out[g] || 0;
+      const reserveStock = (g === "noodle" && !isUrgentFood) ? Math.floor(stock * 0.25) : 0;
+      const sellable = Math.max(0, stock - reserveStock);
+      if (sellable <= 0) continue;
+      const disp = disposableRp();
+      const maxAfford = isUrgentFood ? Math.max(0, S.rp) / rp : disp / rp;
+      const affordable = Math.min(left, sellable, maxAfford);
       if (affordable <= 0) continue;
       const spent = affordable * rp;
       s.out[g] -= affordable;
-      if (S.rp > 0) {
-        const ratio = Math.min(1, spent / S.rp);
-        residents.forEach(r => { r.wallet = Math.max(0, (r.wallet || 0) * (1 - ratio)); });
-        syncRp();
+      if (isUrgentFood) {
+        if (S.rp > 0) {
+          const ratio = Math.min(1, spent / S.rp);
+          residents.forEach(r => { r.wallet = Math.max(0, (r.wallet || 0) * (1 - ratio)); });
+          syncRp();
+        }
+      } else {
+        spendDisposable(spent);
       }
-      income(s, spent, .15); left -= affordable;
+      income(s, spent, .20); left -= affordable;
     }
     const v = want > 0 ? 1 - left / want : 1, o = ECO.sat[g] == null ? 1 : ECO.sat[g]; sat[g] = o * .6 + v * .4;
   });
   const svcs = bl.filter(b => TY[b.t].svc); let ss = pop > 0 ? 0 : 1;
-  if (svcs.length && pop > 0) { const dem = pop * .25; let sp = 0; svcs.forEach(b => { syncRp(); const x = Math.min(S.rp, dem / svcs.length, 8); if (x > 0) { const ratio = Math.min(1, x / Math.max(1, S.rp)); residents.forEach(r => { r.wallet = Math.max(0, (r.wallet || 0) * (1 - ratio)); }); syncRp(); income(b, x, .15); sp += x; } }); ss = Math.min(1, sp / dem); }
+  if (svcs.length && pop > 0) {
+    const dem = pop * .22; let sp = 0;
+    svcs.forEach(b => {
+      const disp = disposableRp();
+      const x = Math.min(disp * 0.2, dem / svcs.length, 6);
+      if (x > 0) {
+        const spent = spendDisposable(x);
+        if (spent > 0) { income(b, spent, .20); sp += spent; }
+      }
+    });
+    ss = Math.min(1, sp / dem);
+  }
   shops.forEach(b => { const T = TY[b.t]; if (b.p >= 1 && !(T.rec && b.st === "缺料")) b.st = T.sell.some(g => (b.out[g] || 0) >= 1) ? "營業中" : "缺貨"; });
   svcs.forEach(b => { b.st = "營業中"; });
   const gl = ["pottery", "wood", "cloth", "iron", "wine"], gs = (gl.reduce((a, g) => a + sat[g], 0) + ss) / (gl.length + 1);
@@ -970,11 +1036,12 @@ function step(d) {
   updateActiveSet();
   activeTick(d);
   if (Math.floor(S.t / 360) !== Math.floor((S.t - d) / 360)) {
+    collectDailyTax();
     bgDay();
-    // 修 #2 & #4：每日商業資金提撥薪資直接發入員工錢包，並同步居民財產池
+    // 每日企業盈利分紅發入員工錢包
     let bizTotal = 0;
     forEachB(b => { if (b.p >= 1 && TY[b.t].jobs) bizTotal += (b.cash || 0); });
-    const inject = bizTotal * 0.12;
+    const inject = bizTotal * 0.15;
     if (inject > 0) {
       forEachB(b => {
         if (b.p >= 1 && TY[b.t].jobs && (b.cash || 0) > 0) {
@@ -1081,7 +1148,6 @@ function drawFarm(b, T, ts) {
   for (let i = 0; i < 4; i++) for (let j = 0; j < 5; j++) { const q = P(x + .18 + i * .2, y + .14 + j * .17, 0); cx.beginPath(); cx.moveTo(q[0], q[1]); cx.lineTo(q[0] + Math.sin(ts / 500 + i + j) * .8, q[1] - hg); cx.stroke(); }
 }
 const SHIRT = ["#b8452e", "#3f6f8a", "#8a6a2c", "#5a7a46", "#8a5f7a", "#c07a3a"];
-// 修 #7：只有橋/池塘橋才抬高
 function drawRes(r, ts) {
   const k = K(Math.floor(r.x), Math.floor(r.y));
   const onBridge = bridges.has(k) || (bm.get(k) && bm.get(k).br);
@@ -1223,7 +1289,7 @@ addEventListener("keydown", e => {
 });
 function togglePause() { paused = !paused; $("#bPause").textContent = paused ? "繼續" : "暫停"; }
 $("#bPause").onclick = togglePause;
-$("#zd").onclick = toggleDebug;   // 修 #9：手機可開除錯
+$("#zd").onclick = toggleDebug;
 $("#backToBank").addEventListener("click", e => {
   e.preventDefault();
   location.assign(new URL("./index.html", location.href).href);
@@ -1237,7 +1303,7 @@ function renderEco() {
   $("#ecoBody").innerHTML = "<p>公庫 <b>" + Math.floor(S.m) + "</b>　居民財產 <b>" + Math.floor(S.rp) + "</b>　商業資金 <b>" + Math.floor(ECO.biz) + "</b>（景元）</p>" +
     "<p>人口 " + residents.size + "（視野內 " + activeResidents.size + "）　職缺 " + ECO.jobs + "　建築 " + countB() + "　幸福度 " + Math.round(ECO.hap) + "%</p>" +
     "<table><tr><th>商品</th><th>庫存</th><th>零售價</th><th>需求滿足</th></tr>" + rows + "</table>" +
-    '<p class="nt">居民現在有自己的錢包、家庭與需求。視野驅動活躍層：視野內居民跑 AI 與移動，視野外只做每日背景結算。AI 頻率會依視野內人數自動調整。</p>';
+    '<p class="nt">居民現在會保留基本儲蓄，有工作的居民每天領取穩定薪資；商鋪會保留隔夜安全糧食，鎮庫每日亦會依戶數與商鋪徵收穩定稅收。</p>';
 }
 function hud() {
   const h = hr(), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
@@ -1261,7 +1327,6 @@ if (!had && migrateV2()) { had = true; home(); save(); }
 if (!had) fresh();
 genChunk(...cOf(DOCK.x, DOCK.y));
 calcConn();
-// 道路連通後，把沒房子的居民散到連通道路上
 if (CR.length) {
   residents.forEach(r => {
     if (r.houseKey == null || !bm.get(r.houseKey)) {
