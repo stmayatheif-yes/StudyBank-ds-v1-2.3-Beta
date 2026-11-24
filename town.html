@@ -329,11 +329,11 @@ function collectDailyTax() {
     const T = TY[b.t];
     if (T.cat === "house") {
       const hh = b.hk ? households.get(b.hk) : null;
-      if (hh && hh.members.length > 0) taxTotal += 15;
+      if (hh && hh.members.length > 0) taxTotal += hh.members.length * 10;
     } else if (T.cat === "shop" || T.cat === "work") {
-      taxTotal += 25;
+      taxTotal += 40;
     } else if (T.cat === "farm") {
-      taxTotal += 12;
+      taxTotal += 20;
     }
   });
   if (taxTotal > 0) S.m += taxTotal;
@@ -962,7 +962,7 @@ function produce(b, T) {
 }
 function tick() {
   forEachB(b => { b.subsidyUsed = 0; });
-  S.subsidyBudget = Math.max(0, S.m * 0.1);
+  S.subsidyBudget = Math.max(0, S.m * 0.02);
   S.subsidyUsedGlobal = 0;
   const bl = []; forEachB(b => { if (b.p >= 1 && ok(b)) { ens(b); bl.push(b); } });
   let pop = residents.size, jobs = 0, pk = 0, biz = 0;
@@ -1001,7 +1001,7 @@ function tick() {
       } else {
         spendDisposable(spent);
       }
-      income(s, spent, .20); left -= affordable;
+      income(s, spent, .30); left -= affordable;
     }
     const v = want > 0 ? 1 - left / want : 1, o = ECO.sat[g] == null ? 1 : ECO.sat[g]; sat[g] = o * .6 + v * .4;
   });
@@ -1013,7 +1013,7 @@ function tick() {
       const x = Math.min(disp * 0.2, dem / svcs.length, 6);
       if (x > 0) {
         const spent = spendDisposable(x);
-        if (spent > 0) { income(b, spent, .20); sp += spent; }
+        if (spent > 0) { income(b, spent, .30); sp += spent; }
       }
     });
     ss = Math.min(1, sp / dem);
@@ -1033,6 +1033,9 @@ function step(d) {
     else if (T.cat === "house" && !b.hk) populateHouse(b);
   });
   acc += d; if (acc >= 10) { acc -= 10; tick(); }
+  if (Math.random() < d * 0.15) {
+    S.m += 5 + Math.floor(ECO.pop * 0.5);
+  }
   updateActiveSet();
   activeTick(d);
   if (Math.floor(S.t / 360) !== Math.floor((S.t - d) / 360)) {
@@ -1303,7 +1306,7 @@ function renderEco() {
   $("#ecoBody").innerHTML = "<p>公庫 <b>" + Math.floor(S.m) + "</b>　居民財產 <b>" + Math.floor(S.rp) + "</b>　商業資金 <b>" + Math.floor(ECO.biz) + "</b>（景元）</p>" +
     "<p>人口 " + residents.size + "（視野內 " + activeResidents.size + "）　職缺 " + ECO.jobs + "　建築 " + countB() + "　幸福度 " + Math.round(ECO.hap) + "%</p>" +
     "<table><tr><th>商品</th><th>庫存</th><th>零售價</th><th>需求滿足</th></tr>" + rows + "</table>" +
-    '<p class="nt">居民現在會保留基本儲蓄，有工作的居民每天領取穩定薪資；商鋪會保留隔夜安全糧食，鎮庫每日亦會依戶數與商鋪徵收穩定稅收。</p>';
+    '<p class="nt">居民現在會保留基本儲蓄，有工作的居民每天領取穩定薪資；商鋪會保留隔夜安全糧食，鎮庫每日依人口、商鋪與農田徵收稅收，商船停靠碼頭亦會繳納關稅。</p>';
 }
 function hud() {
   const h = hr(), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
