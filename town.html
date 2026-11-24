@@ -57,13 +57,14 @@ button,a{font:inherit;color:var(--ink)}
 #resCard button{padding:5px 12px;border-radius:8px;border:1px solid rgba(29,58,53,.3);background:transparent;cursor:pointer}
 #resCard table{width:100%;border-collapse:collapse;margin:6px 0;white-space:normal}
 #resCard th,#resCard td{text-align:left;padding:2px 4px;border-bottom:1px solid rgba(29,58,53,.12);font-size:.8rem}
+#debug{position:fixed;left:8px;right:8px;top:calc(104px + env(safe-area-inset-top,0px));max-height:42vh;display:none;flex-direction:column;padding:10px 12px;overflow:auto;z-index:8;font:12px/1.55 ui-monospace,monospace;white-space:pre-wrap}
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
 <div id="top">
   <div class="row">
-    <a class="pn b" href="index.html">← 題庫</a>
+    <a class="pn b" id="backToBank" href="./index.html">← 題庫</a>
     <div class="pn" id="hud"><b>山河築夢</b><span id="clk"></span></div>
     <button class="pn b" id="bSpd" aria-label="遊戲速度">1×</button>
     <button class="pn b" id="bPause">暫停</button>
@@ -77,6 +78,7 @@ button,a{font:inherit;color:var(--ink)}
 <div id="msg" class="pn"></div>
 <div id="eco" class="pn"><div class="eh"><b>經濟統計</b><button id="ecoX">關閉</button></div><div id="ecoBody"></div></div>
 <div id="resCard" class="pn"><div class="rh"><b id="resName">居民</b><button id="resX">關閉</button></div><div class="body" id="resBody"></div></div>
+<div id="debug" class="pn"></div>
 <div id="sub" class="pn"></div>
 <div id="card" class="pn"><div id="cardT"></div><div class="rw"><button id="cardDel"></button><button id="cardX">關閉</button></div></div>
 <div id="bar" class="pn"></div>
@@ -172,13 +174,12 @@ function genChunk(cx, cy) {
   const t = { tiles: new Uint8Array(CH * CH) };
   for (let ly = 0; ly < CH; ly++) for (let lx = 0; lx < CH; lx++) {
     const x = cx * CH + lx, y = cy * CH + ly;
-    const riverDist = Math.abs(x - RX), riverW = 2 + fbm(y * .02, 7, 11, 3) * 3;
+    const riverDist = x < RX ? RX - x : x >= RX + 2 ? x - (RX + 1) : 0;
     let h = fbm(x * .015, y * .015, 1, 4) * .7 + fbm(x * .05, y * .05, 3, 3) * .3;
-    if (riverDist < riverW + 2) h *= .35;
     const mA = fbm(x * .008 + 40, y * .008, 5, 4); if (x > RX + 30) h += mA * .8;
     let b;
-    if (riverDist < riverW) b = BIOME.water;
-    else if (riverDist < riverW + 1.2) b = BIOME.river;
+    if (x >= RX && x < RX + 2) b = BIOME.water;
+    else if (riverDist <= 1) b = BIOME.river;
     else if (h > .82) b = BIOME.mountain;
     else if (h > .62) b = BIOME.forest;
     else if (h > .42) b = BIOME.plain;
@@ -264,7 +265,7 @@ function mkResident(opts) {
     needs: { hun: 60 + Math.random() * 40, fat: 60 + Math.random() * 40, joy: 50 + Math.random() * 50, soc: 50 + Math.random() * 50 },
     mood: 60 + Math.random() * 30,
     rel: { parent: opts.parent || null, spouse: null, children: [] },
-    log: [], x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, state: "idle", timer: 0, target: null, phase: 0
+    log: [], x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, state: "idle", timer: 0, target: null, path: null, pathIndex: 0, afterMove: "idle", phase: 0
   };
   if (opts.log !== false) r.log.push("第" + (Math.floor(S.t / 360) + 1) + "日 遷入小鎮");
   residents.set(id, r);
@@ -339,43 +340,108 @@ function refreshJobs() {
   JOBS_CACHE.length = 0;
   forEachB(b => { if (b.p >= 1 && TY[b.t].jobs && ok(b)) JOBS_CACHE.push(b); });
 }
-function nearestRoad(x, y) {
-  // 從 (x,y) 找最近 conn 道路
-  if (conn.has(K(x, y))) return [x, y];
-  let best = null, bd = 1e9;
-  for (const k of CR) { const rx = k % N, ry = (k / N) | 0; const d = Math.abs(rx - x) + Math.abs(ry - y); if (d < bd) { bd = d; best = [rx, ry]; } }
+function nearestRoad(x, y, maxDistance = 8) {
+  // 只從已連通河岸入口的道路中尋找，不會把未連通道路當成可走道路。
+  let best = null, bd = maxDistance + 1;
+  for (const k of CR) {
+    const rx = k % N, ry = (k / N) | 0;
+    const d = Math.abs(rx - x) + Math.abs(ry - y);
+    if (d < bd) { bd = d; best = [rx, ry]; }
+  }
   return best;
+}
+function buildingRoad(b) {
+  if (!b) return null;
+  let best = null, score = Infinity;
+  for (const d of D4) {
+    const x = b.x + d[0], y = b.y + d[1];
+    if (!conn.has(K(x, y))) continue;
+    const v = Math.abs(d[0]) + Math.abs(d[1]);
+    if (v < score) { score = v; best = [x, y]; }
+  }
+  return best;
+}
+function roadPath(start, goal) {
+  if (!start || !goal) return null;
+  const sk = K(start[0], start[1]), gk = K(goal[0], goal[1]);
+  if (!conn.has(sk) || !conn.has(gk)) return null;
+  if (sk === gk) return [start];
+  const queue = [sk], parent = new Map([[sk, -1]]);
+  let head = 0, found = false;
+  while (head < queue.length) {
+    const k = queue[head++], x = k % N, y = (k / N) | 0;
+    for (const d of D4) {
+      const nx = x + d[0], ny = y + d[1], nk = K(nx, ny);
+      if (!conn.has(nk) || parent.has(nk)) continue;
+      parent.set(nk, k);
+      if (nk === gk) { found = true; break; }
+      queue.push(nk);
+    }
+    if (found) break;
+  }
+  if (!found) return null;
+  const path = []; let k = gk;
+  while (k !== -1) { path.push([k % N, (k / N) | 0]); k = parent.get(k); }
+  path.reverse(); return path;
+}
+function startTravel(r, targetBuilding, fallbackRoad, after) {
+  const sx = Math.floor(r.x), sy = Math.floor(r.y);
+  const from = nearestRoad(sx, sy, 8);
+  const to = targetBuilding ? buildingRoad(targetBuilding) : fallbackRoad;
+  if (!from || !to) { r.state = "idle"; r.timer = 1; r.target = null; r.path = null; return false; }
+  const path = roadPath(from, to);
+  if (!path) { r.state = "idle"; r.timer = 1; r.target = null; r.path = null; return false; }
+  r.path = path; r.pathIndex = 0; r.afterMove = after || "idle";
+  r.target = to; r.state = "move"; r.timer = 999;
+  return true;
+}
+function arrive(r) {
+  r.path = null; r.pathIndex = 0; r.target = null;
+  r.state = r.afterMove || "idle";
+  if (r.state === "sleep") { r.needs.fat = Math.min(100, r.needs.fat + 50); r.mood = Math.min(100, r.mood + 2); r.timer = 3; }
+  else if (r.state === "work") { r.needs.fat = Math.max(0, r.needs.fat - 10); r.needs.joy = Math.max(0, r.needs.joy - 2); r.timer = 4; }
+  else if (r.state === "social") { r.needs.soc = Math.min(100, r.needs.soc + 30); r.mood = Math.min(100, r.mood + 3); r.timer = 3; }
+  else { r.timer = 1 + Math.random() * 2; }
 }
 function aiStep(r, dt) {
   r.needs.hun = Math.max(0, r.needs.hun - dt * .6);
   r.needs.fat = Math.max(0, r.needs.fat - dt * .4);
   r.needs.joy = Math.max(0, r.needs.joy - dt * .2);
   r.needs.soc = Math.max(0, r.needs.soc - dt * .2);
+  if (r.state === "move" && r.path && r.path.length) {
+    const node = r.path[r.pathIndex], tx = node[0] + .5, ty = node[1] + .5;
+    const dx = tx - r.x, dy = ty - r.y, dd = Math.hypot(dx, dy), v = dt * 1.1;
+    if (dd > v) { r.x += dx / dd * v; r.y += dy / dd * v; }
+    else {
+      r.x = tx; r.y = ty; r.pathIndex++;
+      if (r.pathIndex >= r.path.length) arrive(r);
+    }
+    return;
+  }
   r.timer -= dt;
   if (r.timer <= 0) decide(r);
-  // 移動
-  if (r.state === "move" && r.target) {
-    const tx = r.target[0] + .5, ty = r.target[1] + .5, dx = tx - r.x, dy = ty - r.y, dd = Math.hypot(dx, dy), v = dt * 1.1;
-    if (dd > v) { r.x += dx / dd * v; r.y += dy / dd * v; }
-    else { r.x = tx; r.y = ty; r.state = "idle"; r.timer = .5 + Math.random(); }
-  }
 }
 function decide(r) {
-  // 優先：吃飯 > 睡覺 > 上班 > 購物 > 散步
   const hour = hr();
   if (r.needs.hun < 30) { r.state = "eat"; r.needs.hun = Math.min(100, r.needs.hun + 40); r.mood = Math.min(100, r.mood + 3); r.timer = 2; return; }
-  if (r.needs.fat < 30 || hour < 6 || hour >= 23) { r.state = "sleep"; r.needs.fat = Math.min(100, r.needs.fat + 50); r.mood = Math.min(100, r.mood + 2); r.timer = 3; return; }
-  if (r.jobKey && hour >= 7 && hour < 18) { r.state = "work"; r.needs.fat -= 10; r.needs.joy -= 2; r.timer = 4; return; }
-  if (r.needs.soc < 40 && hour >= 18 && hour < 22) { r.state = "social"; r.needs.soc = Math.min(100, r.needs.soc + 30); r.mood = Math.min(100, r.mood + 3); r.timer = 3; return; }
-  // 散步
-  r.state = "walk"; r.needs.joy = Math.min(100, r.needs.joy + 5); r.timer = 2 + Math.random() * 2;
-  // 選目標：上班/家/道路
-  let tgt = null;
-  if (r.state === "work" && r.jobKey) { const jb = bm.get(r.jobKey); if (jb) tgt = [jb.x, jb.y]; }
-  if (!tgt && r.houseKey) { const hb = bm.get(r.houseKey); if (hb) tgt = [hb.x, hb.y]; }
-  if (!tgt && CR.length) { const k = CR[Math.random() * CR.length | 0]; tgt = [k % N, (k / N) | 0]; }
-  r.target = tgt;
-  if (tgt) r.state = "move";
+  if (r.needs.fat < 30 || hour < 6 || hour >= 23) {
+    const hb = r.houseKey != null ? bm.get(r.houseKey) : null;
+    if (hb && startTravel(r, hb, null, "sleep")) return;
+    r.state = "sleep"; r.needs.fat = Math.min(100, r.needs.fat + 35); r.timer = 3; return;
+  }
+  if (r.jobKey && hour >= 7 && hour < 18) {
+    const jb = bm.get(r.jobKey);
+    if (jb && startTravel(r, jb, null, "work")) return;
+  }
+  if (r.needs.soc < 40 && hour >= 18 && hour < 22 && CR.length) {
+    const k = CR[Math.random() * CR.length | 0];
+    if (startTravel(r, null, [k % N, (k / N) | 0], "social")) return;
+  }
+  if (CR.length) {
+    const k = CR[Math.random() * CR.length | 0];
+    if (startTravel(r, null, [k % N, (k / N) | 0], "walk")) { r.needs.joy = Math.min(100, r.needs.joy + 5); return; }
+  }
+  r.state = "idle"; r.timer = 2;
 }
 function activeTick(dt) {
   const arr = Array.from(activeResidents);
@@ -426,7 +492,7 @@ function load() {
       d.ch[k].b.forEach(a => { if (TY[a[0]]) c.bm.set(lKey(a[1], a[2]), Object.assign({ t: a[0], x: a[1], y: a[2], p: a[3], r: a[4], c: a[5] }, a[6] || {})); });
     }
     (d.rs || []).forEach(a => {
-      residents.set(a[0], { id: a[0], name: a[1], gender: a[2], age: a[3], born: a[4], familyId: a[5], houseKey: a[6], jobKey: a[7], skill: a[8], wallet: a[9], needs: a[10], mood: a[11], rel: { parent: a[12], spouse: a[13], children: a[14] || [] }, log: a[15] || [], x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, state: "idle", timer: 0, target: null, phase: 0 });
+      residents.set(a[0], { id: a[0], name: a[1], gender: a[2], age: a[3], born: a[4], familyId: a[5], houseKey: a[6], jobKey: a[7], skill: a[8], wallet: a[9], needs: a[10], mood: a[11], rel: { parent: a[12], spouse: a[13], children: a[14] || [] }, log: a[15] || [], x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, state: "idle", timer: 0, target: null, path: null, pathIndex: 0, afterMove: "idle", phase: 0 });
     });
     (d.hhs || []).forEach(a => households.set(a[0], { id: a[0], homeKey: a[1], members: a[2], wallet: a[3] }));
     nextId = d.nid || 1; nextHouseId = d.nhid || 1;
@@ -578,21 +644,42 @@ function mp(g) { const T = GD[g], s = SUP[g] || 0, tg = TGT[g] || 12; return Mat
 function income(s, pay, rate) { const tax = pay * rate, wage = pay * .3; s.cash += pay - tax - wage; S.m += tax; S.rp += wage; }
 function scan(bl) { SUP = {}; SL = {}; bl.forEach(b => { for (const g in b.out) if (b.out[g] > 0) { SUP[g] = (SUP[g] || 0) + b.out[g]; if (TY[b.t].cat !== "shop") (SL[g] = SL[g] || []).push(b); } }); }
 function buy(b, g, qty, dst) {
-  const pr = mp(g); qty = Math.min(qty, Math.floor(b.cash / pr)); if (qty <= 0) return;
+  const pr = mp(g);
+  const isInput = dst === b.in;
+  const subsidyCap = Math.max(20, (b.c || 0) * .5);
+  const subsidyLeft = isInput ? Math.max(0, subsidyCap - (b.subsidyUsed || 0)) : 0;
+  const available = Math.max(0, b.cash || 0) + Math.min(S.m, subsidyLeft);
+  qty = Math.min(qty, Math.floor(available / pr)); if (qty <= 0) return 0;
   let got = 0;
-  for (const s of (SL[g] || [])) { if (s === b) continue; const t = Math.min(qty - got, Math.floor(s.out[g] || 0)); if (t <= 0) continue; s.out[g] -= t; b.cash -= t * pr; income(s, t * pr, .05); got += t; if (got >= qty) break; }
+  for (const supplier of (SL[g] || [])) {
+    if (supplier === b) continue;
+    const amount = Math.min(qty - got, Math.floor(supplier.out[g] || 0));
+    if (amount <= 0) continue;
+    const cost = amount * pr;
+    const fromBusiness = Math.min(Math.max(0, b.cash || 0), cost);
+    const fromTreasury = cost - fromBusiness;
+    b.cash = Math.max(0, (b.cash || 0) - fromBusiness);
+    if (fromTreasury > 0) { S.m = Math.max(0, S.m - fromTreasury); b.subsidyUsed = (b.subsidyUsed || 0) + fromTreasury; }
+    supplier.out[g] -= amount; income(supplier, cost, .05); got += amount;
+    if (got >= qty) break;
+  }
   if (got) dst[g] = (dst[g] || 0) + got;
+  return got;
 }
 function produce(b, T) {
   const r = T.rec; b.prog = Math.min(1.5, (b.prog || 0) + .5);
   for (const g in r.in) { const need = r.in[g] * 2 - (b.in[g] || 0); if (need > 0) buy(b, g, need, b.in); }
   if (b.prog < 1) return;
-  if (!Object.keys(r.in).every(g => (b.in[g] || 0) >= r.in[g])) { b.st = "缺料"; return; }
+  if (!Object.keys(r.in).every(g => (b.in[g] || 0) >= r.in[g])) {
+    const canPay = Object.keys(r.in).some(g => (b.in[g] || 0) < r.in[g] && ((b.cash || 0) + S.m) >= mp(g));
+    b.st = canPay ? "缺料" : "缺料／資金不足"; return;
+  }
   if (!Object.keys(r.out).every(g => (b.out[g] || 0) + r.out[g] <= 24)) { b.st = "滿倉"; return; }
   b.prog -= 1; for (const g in r.in) b.in[g] -= r.in[g]; for (const g in r.out) b.out[g] = (b.out[g] || 0) + r.out[g]; b.st = "運作中";
 }
 function tick() {
   refreshJobs();
+  forEachB(b => { b.subsidyUsed = 0; });
   const bl = []; forEachB(b => { if (b.p >= 1 && ok(b)) { ens(b); bl.push(b); } });
   let pop = residents.size, jobs = 0, pk = 0, biz = 0;
   bl.forEach(b => { const T = TY[b.t]; if (T.cat === "house") { if (b.p >= 1 && !b.hk) populateHouse(b); } else if (T.cat === "park") pk++; else { jobs += T.jobs || 3; biz += b.cash; } });
@@ -823,15 +910,44 @@ function up(e) {
 }
 cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
 cv.addEventListener("wheel", e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Z * Math.exp(-e.deltaY * .0015)); dirty(); }, { passive: false });
+let debugOpen = false;
+function toggleDebug() {
+  debugOpen = !debugOpen;
+  $("#debug").style.display = debugOpen ? "flex" : "none";
+  if (debugOpen) renderDebug();
+}
+function renderDebug() {
+  if (!debugOpen) return;
+  const connected = conn.size, allRoads = (() => { let n = 0; forEachRoad(() => n++); return n; })();
+  const disconnected = Math.max(0, allRoads - connected);
+  const activeMoving = Array.from(activeResidents).filter(id => { const r = residents.get(id); return r && r.state === "move"; }).length;
+  const lowCash = allBuildings().filter(b => b.p >= 1 && TY[b.t].rec && (b.cash || 0) < 10).length;
+  $("#debug").textContent =
+    "DEBUG PANEL  [D 關閉]\n" +
+    "時間：" + (Math.floor(S.t / 360) + 1) + " 日 / " + hr().toFixed(2) + " 時\n" +
+    "道路總數：" + allRoads + "｜河岸連通：" + connected + "｜未連通：" + disconnected + "\n" +
+    "居民：" + residents.size + "｜活躍：" + activeResidents.size + "｜移動中：" + activeMoving + "\n" +
+    "建築：" + countB() + "｜低資金生產建築：" + lowCash + "\n" +
+    "鎮庫：" + Math.floor(S.m) + "｜居民財產：" + Math.floor(S.rp) + "\n" +
+    "連通規則：從河道兩岸入口 BFS；未連通道路不納入居民路徑。";
+}
 addEventListener("keydown", e => {
   const k = e.key, s = 40 / Z;
-  if (k === "ArrowLeft" || k === "a") cam.x -= s; else if (k === "ArrowRight" || k === "d") cam.x += s;
-  else if (k === "ArrowUp" || k === "w") cam.y -= s; else if (k === "ArrowDown" || k === "s") cam.y += s;
-  else if (k === "Escape") pick("look"); else if (k === " ") { e.preventDefault(); togglePause(); }
+  if (k === "d" || k === "D") { toggleDebug(); return; }
+  if (k === "ArrowLeft" || k === "a" || k === "A") cam.x -= s;
+  else if (k === "ArrowRight") cam.x += s;
+  else if (k === "ArrowUp" || k === "w" || k === "W") cam.y -= s;
+  else if (k === "ArrowDown" || k === "s" || k === "S") cam.y += s;
+  else if (k === "Escape") pick("look");
+  else if (k === " ") { e.preventDefault(); togglePause(); }
   clampCam();
 });
 function togglePause() { paused = !paused; $("#bPause").textContent = paused ? "繼續" : "暫停"; }
 $("#bPause").onclick = togglePause;
+$("#backToBank").addEventListener("click", e => {
+  e.preventDefault();
+  location.assign(new URL("./index.html", location.href).href);
+});
 $("#bSpd").onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; $("#bSpd").textContent = speed + "×"; dirty(); };
 $("#zi").onclick = () => { zoomAt(VW / 2, VH / 2, Z * 1.25); dirty(); }; $("#zo").onclick = () => { zoomAt(VW / 2, VH / 2, Z / 1.25); dirty(); };
 $("#zh").onclick = home;
@@ -848,6 +964,7 @@ function hud() {
   $("#sPop").textContent = residents.size; $("#sFood").textContent = Math.floor(ECO.food); $("#sHap").textContent = Math.round(ECO.hap); $("#sM").textContent = Math.floor(S.m);
   $("#clk").textContent = "第" + (Math.floor(S.t / 360) + 1) + "日 " + pad(hh) + ":" + pad(mm) + "・" + SH[Math.floor(((hh + 1) % 24) / 2)] + "時" + (dark(h) > .5 ? "・夜" : "");
   if (ecoOpen) renderEco();
+  if (debugOpen) renderDebug();
   if (resCardR) { if (!residents.has(resCardR.id)) { $("#resCard").style.display = "none"; resCardR = null; } }
 }
 $("#bEco").onclick = () => { ecoOpen = true; $("#eco").style.display = "flex"; renderEco(); };
