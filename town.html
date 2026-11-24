@@ -291,6 +291,14 @@ function mkHousehold(homeKey) {
   households.set(id, { id, homeKey, members: [], wallet: 0 });
   return id;
 }
+// 同一戶居民分散站在住宅格內，避免出生或讀檔後全部重疊成一個人。
+const HOME_SPOTS = [[.28,.32],[.72,.32],[.28,.68],[.72,.68],[.5,.5],[.5,.22]];
+function placeResidentAtHome(r, b, index) {
+  if (!r || !b) return;
+  const spot = HOME_SPOTS[(index || 0) % HOME_SPOTS.length];
+  r.x = b.x + spot[0];
+  r.y = b.y + spot[1];
+}
 // 為新落成民居生成住戶
 function populateHouse(b) {
   if (!b.hk) { b.hk = mkHousehold(b.x * N + b.y); }
@@ -300,8 +308,9 @@ function populateHouse(b) {
   const a = mkResident({ gender: male ? "m" : "f", age: 20 + Math.random() * 15 | 0, familyId: hh.id, houseKey: b.x * N + b.y, wallet: 60 + Math.random() * 80 | 0 });
   const bb = mkResident({ gender: male ? "f" : "m", age: 18 + Math.random() * 15 | 0, familyId: hh.id, houseKey: b.x * N + b.y, wallet: 40 + Math.random() * 60 | 0 });
   a.rel.spouse = bb.id; bb.rel.spouse = a.id;
-  a.x = b.x + .5; a.y = b.y + .5; bb.x = b.x + .5; bb.y = b.y + .5;
   hh.members.push(a.id, bb.id);
+  placeResidentAtHome(a, b, 0);
+  placeResidentAtHome(bb, b, 1);
   activeResidents.add(a.id); activeResidents.add(bb.id);
   b.r = Math.min(4, hh.members.length);
 }
@@ -328,8 +337,10 @@ function bgDay() {
       const hh = households.get(r.familyId);
       if (hh && hh.members.length < 6) {
         const child = mkResident({ age: 0, familyId: hh.id, houseKey: r.houseKey, parent: r.id, wallet: 0, gender: Math.random() < .5 ? "m" : "f" });
-        child.x = r.x; child.y = r.y;
         hh.members.push(child.id);
+        const home = r.houseKey != null ? bm.get(r.houseKey) : null;
+        placeResidentAtHome(child, home, hh.members.length - 1);
+        if (!home) { child.x = r.x + .08 * hh.members.length; child.y = r.y + .08 * hh.members.length; }
         r.rel.children.push(child.id);
         const sp = residents.get(r.rel.spouse); if (sp) sp.rel.children.push(child.id);
         r.log.push("第" + (day + 1) + "日 孩子" + child.name + "出生");
@@ -519,8 +530,14 @@ function load() {
     S = { m: d.m, t: d.t, rp: d.rp || 0 };
     if (d.cam) { cam.x = d.cam.x; cam.y = d.cam.y; Z = d.cam.z || Z; }
     if (d.sel) sel = Object.assign(sel, d.sel); if (d.tool) tool = d.tool; if (d.sp) { speed = d.sp; $("#bSpd").textContent = speed + "×"; }
-    // 把居民放回他們的家或路上
-    residents.forEach(r => { const hb = r.houseKey != null ? bm.get(r.houseKey) : null; if (hb) { r.x = hb.x + .5; r.y = hb.y + .5; } else if (CR.length) { const k = CR[0]; r.x = k % N + .5; r.y = (k / N) + .5; } });
+    // 讀檔後將同戶居民分散放回住宅，避免所有家庭成員重疊。
+    residents.forEach(r => {
+      const hb = r.houseKey != null ? bm.get(r.houseKey) : null;
+      const hh = r.familyId != null ? households.get(r.familyId) : null;
+      const idx = hh ? Math.max(0, hh.members.indexOf(r.id)) : 0;
+      if (hb) placeResidentAtHome(r, hb, idx);
+      else if (CR.length) { const k = CR[0]; r.x = k % N + .5; r.y = (k / N) + .5; }
+    });
     reassignActive();
     return true;
   } catch (e) { console.warn(e); return false; }
@@ -896,8 +913,9 @@ function draw(ts) {
     else it.push([b.x + b.y + .5, () => drawB(b, ts)]);
   });
   residents.forEach(r => {
-    if (!activeResidents.has(r.id) || !vis(r.x, r.y)) return;
-    if (dk > .6 && r.state === "sleep") return;
+    // 全體居民都要繪製；非活躍居民留在住宅附近，仍可看見但不執行即時 AI。
+    if (!vis(r.x, r.y)) return;
+    if (activeResidents.has(r.id) && dk > .6 && r.state === "sleep") return;
     it.push([r.x + r.y, () => drawRes(r, ts)]);
   });
   const ty = Math.round(cam.y / HH - RX), st = Math.floor((ty - 50) / 100) * 100;
