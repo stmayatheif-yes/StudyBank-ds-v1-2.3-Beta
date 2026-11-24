@@ -195,14 +195,45 @@ function terrainAt(x, y) { if (x < 0 || y < 0 || x >= N || y >= N) return "meado
 // ============================================================
 let conn = new Set(), CR = [];
 function calcConn() {
-  conn = new Set(); CR = []; const q = [];
-  forEachRoad((x, y) => { if (x === RX - 1 || x === RX + 2) { const k = x * N + y; if (!conn.has(k)) { conn.add(k); q.push([x, y]); } } });
+  conn = new Set();
+  CR = [];
+
+  const q = [];
+
+  // 河岸入口作為道路網起點；道路座標統一使用 K(x, y)。
+  forEachRoad((x, y) => {
+    if (x === RX - 1 || x === RX + 2) {
+      const k = K(x, y);
+      if (!conn.has(k)) {
+        conn.add(k);
+        q.push([x, y]);
+      }
+    }
+  });
+
   while (q.length) {
-    const [x, y] = q.pop(); CR.push(x * N + y);
-    for (const d of D4) { const a = x + d[0], b = y + d[1]; if (!hasRoad(a, b)) continue; const k = a * N + b; if (conn.has(k)) continue; conn.add(k); q.push([a, b]); }
+    const [x, y] = q.pop();
+    CR.push(K(x, y));
+
+    for (const d of D4) {
+      const nx = x + d[0];
+      const ny = y + d[1];
+      if (!hasRoad(nx, ny)) continue;
+
+      const nk = K(nx, ny);
+      if (conn.has(nk)) continue;
+
+      conn.add(nk);
+      q.push([nx, ny]);
+    }
   }
 }
-const roadAdj = (x, y) => D4.some(d => hasRoad(x + d[0], y + d[1]) && conn.has((x + d[0]) * N + (y + d[1])));
+
+const roadAdj = (x, y) => D4.some(d => {
+  const nx = x + d[0];
+  const ny = y + d[1];
+  return hasRoad(nx, ny) && conn.has(K(nx, ny));
+});
 const ok = b => TY[b.t].cat === "park" || roadAdj(b.x, b.y);
 
 // ============================================================
@@ -340,15 +371,23 @@ function refreshJobs() {
   JOBS_CACHE.length = 0;
   forEachB(b => { if (b.p >= 1 && TY[b.t].jobs && ok(b)) JOBS_CACHE.push(b); });
 }
-function nearestRoad(x, y, maxDistance = 8) {
-  // 只從已連通河岸入口的道路中尋找，不會把未連通道路當成可走道路。
-  let best = null, bd = maxDistance + 1;
-  for (const k of CR) {
-    const rx = k % N, ry = (k / N) | 0;
-    const d = Math.abs(rx - x) + Math.abs(ry - y);
-    if (d < bd) { bd = d; best = [rx, ry]; }
+function nearestRoad(x, y) {
+  // 人物已在連通道路上，不需要重新接入。
+  if (hasRoad(x, y) && conn.has(K(x, y))) {
+    return [x, y];
   }
-  return best;
+
+  // 建築入口只允許四方向相鄰道路，禁止跨越空地尋找最近道路。
+  for (const d of D4) {
+    const nx = x + d[0];
+    const ny = y + d[1];
+
+    if (hasRoad(nx, ny) && conn.has(K(nx, ny))) {
+      return [nx, ny];
+    }
+  }
+
+  return null;
 }
 function buildingRoad(b) {
   if (!b) return null;
@@ -385,14 +424,47 @@ function roadPath(start, goal) {
   path.reverse(); return path;
 }
 function startTravel(r, targetBuilding, fallbackRoad, after) {
-  const sx = Math.floor(r.x), sy = Math.floor(r.y);
-  const from = nearestRoad(sx, sy, 8);
-  const to = targetBuilding ? buildingRoad(targetBuilding) : fallbackRoad;
-  if (!from || !to) { r.state = "idle"; r.timer = 1; r.target = null; r.path = null; return false; }
+  const sx = Math.floor(r.x);
+  const sy = Math.floor(r.y);
+
+  const from = nearestRoad(sx, sy);
+  const to = targetBuilding
+    ? buildingRoad(targetBuilding)
+    : fallbackRoad;
+
+  if (!from || !to) {
+    r.state = "idle";
+    r.timer = 1;
+    r.target = null;
+    r.path = null;
+    return false;
+  }
+
+  // 目的地必須是已連通道路，不能走向孤立道路。
+  if (!conn.has(K(to[0], to[1]))) {
+    r.state = "idle";
+    r.timer = 1;
+    r.target = null;
+    r.path = null;
+    return false;
+  }
+
   const path = roadPath(from, to);
-  if (!path) { r.state = "idle"; r.timer = 1; r.target = null; r.path = null; return false; }
-  r.path = path; r.pathIndex = 0; r.afterMove = after || "idle";
-  r.target = to; r.state = "move"; r.timer = 999;
+  if (!path || !path.length) {
+    r.state = "idle";
+    r.timer = 1;
+    r.target = null;
+    r.path = null;
+    return false;
+  }
+
+  r.path = path;
+  r.pathIndex = 0;
+  r.afterMove = after || "idle";
+  r.target = to;
+  r.state = "move";
+  r.timer = 999;
+
   return true;
 }
 function arrive(r) {
