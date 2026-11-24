@@ -195,44 +195,28 @@ function terrainAt(x, y) { if (x < 0 || y < 0 || x >= N || y >= N) return "meado
 // ============================================================
 let conn = new Set(), CR = [];
 function calcConn() {
-  conn = new Set();
-  CR = [];
-
-  const q = [];
-
-  // 河岸入口作為道路網起點；道路座標統一使用 K(x, y)。
+  // 所有道路座標統一使用 K(x,y) = y*N+x，避免 x/y 編碼顛倒。
+  conn = new Set(); CR = []; const q = [];
   forEachRoad((x, y) => {
     if (x === RX - 1 || x === RX + 2) {
       const k = K(x, y);
-      if (!conn.has(k)) {
-        conn.add(k);
-        q.push([x, y]);
-      }
+      if (!conn.has(k)) { conn.add(k); q.push([x, y]); }
     }
   });
-
-  while (q.length) {
-    const [x, y] = q.pop();
+  let head = 0;
+  while (head < q.length) {
+    const [x, y] = q[head++];
     CR.push(K(x, y));
-
     for (const d of D4) {
-      const nx = x + d[0];
-      const ny = y + d[1];
-      if (!hasRoad(nx, ny)) continue;
-
-      const nk = K(nx, ny);
-      if (conn.has(nk)) continue;
-
-      conn.add(nk);
-      q.push([nx, ny]);
+      const a = x + d[0], b = y + d[1], k = K(a, b);
+      if (!hasRoad(a, b) || conn.has(k)) continue;
+      conn.add(k); q.push([a, b]);
     }
   }
 }
-
 const roadAdj = (x, y) => D4.some(d => {
-  const nx = x + d[0];
-  const ny = y + d[1];
-  return hasRoad(nx, ny) && conn.has(K(nx, ny));
+  const a = x + d[0], b = y + d[1];
+  return hasRoad(a, b) && conn.has(K(a, b));
 });
 const ok = b => TY[b.t].cat === "park" || roadAdj(b.x, b.y);
 
@@ -372,21 +356,12 @@ function refreshJobs() {
   forEachB(b => { if (b.p >= 1 && TY[b.t].jobs && ok(b)) JOBS_CACHE.push(b); });
 }
 function nearestRoad(x, y) {
-  // 人物已在連通道路上，不需要重新接入。
-  if (hasRoad(x, y) && conn.has(K(x, y))) {
-    return [x, y];
-  }
-
-  // 建築入口只允許四方向相鄰道路，禁止跨越空地尋找最近道路。
+  // 已站在連通道路上就直接使用；否則只允許接入相鄰道路，避免跨空地瞬移。
+  if (conn.has(K(x, y))) return [x, y];
   for (const d of D4) {
-    const nx = x + d[0];
-    const ny = y + d[1];
-
-    if (hasRoad(nx, ny) && conn.has(K(nx, ny))) {
-      return [nx, ny];
-    }
+    const a = x + d[0], b = y + d[1];
+    if (conn.has(K(a, b))) return [a, b];
   }
-
   return null;
 }
 function buildingRoad(b) {
@@ -400,7 +375,8 @@ function buildingRoad(b) {
   }
   return best;
 }
-function roadPath(start, goal) {
+function findPath(sx, sy, tx, ty) {
+  const start = [sx, sy], goal = [tx, ty];
   if (!start || !goal) return null;
   const sk = K(start[0], start[1]), gk = K(goal[0], goal[1]);
   if (!conn.has(sk) || !conn.has(gk)) return null;
@@ -423,48 +399,20 @@ function roadPath(start, goal) {
   while (k !== -1) { path.push([k % N, (k / N) | 0]); k = parent.get(k); }
   path.reverse(); return path;
 }
+const roadPath = (start, goal) => start && goal ? findPath(start[0], start[1], goal[0], goal[1]) : null;
 function startTravel(r, targetBuilding, fallbackRoad, after) {
-  const sx = Math.floor(r.x);
-  const sy = Math.floor(r.y);
-
-  const from = nearestRoad(sx, sy);
-  const to = targetBuilding
-    ? buildingRoad(targetBuilding)
-    : fallbackRoad;
-
-  if (!from || !to) {
-    r.state = "idle";
-    r.timer = 1;
-    r.target = null;
-    r.path = null;
-    return false;
+  const sx = Math.floor(r.x), sy = Math.floor(r.y);
+  let from = nearestRoad(sx, sy);
+  if (!from && r.houseKey != null) {
+    const home = bm.get(r.houseKey);
+    if (home) from = buildingRoad(home);
   }
-
-  // 目的地必須是已連通道路，不能走向孤立道路。
-  if (!conn.has(K(to[0], to[1]))) {
-    r.state = "idle";
-    r.timer = 1;
-    r.target = null;
-    r.path = null;
-    return false;
-  }
-
+  const to = targetBuilding ? buildingRoad(targetBuilding) : fallbackRoad;
+  if (!from || !to) { r.state = "idle"; r.timer = 1; r.target = null; r.path = null; return false; }
   const path = roadPath(from, to);
-  if (!path || !path.length) {
-    r.state = "idle";
-    r.timer = 1;
-    r.target = null;
-    r.path = null;
-    return false;
-  }
-
-  r.path = path;
-  r.pathIndex = 0;
-  r.afterMove = after || "idle";
-  r.target = to;
-  r.state = "move";
-  r.timer = 999;
-
+  if (!path) { r.state = "idle"; r.timer = 1; r.target = null; r.path = null; return false; }
+  r.path = path; r.pathIndex = 0; r.afterMove = after || "idle";
+  r.target = to; r.state = "move"; r.timer = 999;
   return true;
 }
 function arrive(r) {
@@ -739,15 +687,35 @@ function buy(b, g, qty, dst) {
   return got;
 }
 function produce(b, T) {
-  const r = T.rec; b.prog = Math.min(1.5, (b.prog || 0) + .5);
-  for (const g in r.in) { const need = r.in[g] * 2 - (b.in[g] || 0); if (need > 0) buy(b, g, need, b.in); }
+  const r = T.rec;
+  b.prog = Math.min(1.5, (b.prog || 0) + .5);
+  // 補料最多維持需求量的兩倍；現金不足時少量出售既有成品周轉。
+  for (const g in r.in) {
+    const need = r.in[g] * 2 - (b.in[g] || 0);
+    if (need <= 0) continue;
+    const price = mp(g);
+    if ((b.cash || 0) < price * need) {
+      for (const og in (b.out || {})) {
+        if ((b.out[og] || 0) <= 0) continue;
+        const sellQty = Math.min(b.out[og], 2);
+        b.out[og] -= sellQty;
+        b.cash = (b.cash || 0) + sellQty * mp(og) * .8;
+        if (b.cash >= price * need) break;
+      }
+    }
+    buy(b, g, need, b.in);
+  }
   if (b.prog < 1) return;
   if (!Object.keys(r.in).every(g => (b.in[g] || 0) >= r.in[g])) {
     const canPay = Object.keys(r.in).some(g => (b.in[g] || 0) < r.in[g] && ((b.cash || 0) + S.m) >= mp(g));
-    b.st = canPay ? "缺料" : "缺料／資金不足"; return;
+    b.st = canPay ? "缺料" : "缺料／資金不足";
+    return;
   }
   if (!Object.keys(r.out).every(g => (b.out[g] || 0) + r.out[g] <= 24)) { b.st = "滿倉"; return; }
-  b.prog -= 1; for (const g in r.in) b.in[g] -= r.in[g]; for (const g in r.out) b.out[g] = (b.out[g] || 0) + r.out[g]; b.st = "運作中";
+  b.prog -= 1;
+  for (const g in r.in) b.in[g] -= r.in[g];
+  for (const g in r.out) b.out[g] = (b.out[g] || 0) + r.out[g];
+  b.st = "運作中";
 }
 function tick() {
   refreshJobs();
@@ -994,13 +962,22 @@ function renderDebug() {
   const disconnected = Math.max(0, allRoads - connected);
   const activeMoving = Array.from(activeResidents).filter(id => { const r = residents.get(id); return r && r.state === "move"; }).length;
   const lowCash = allBuildings().filter(b => b.p >= 1 && TY[b.t].rec && (b.cash || 0) < 10).length;
+  const production = [];
+  forEachB(b => {
+    const T = TY[b.t];
+    if (!T.rec || production.length >= 18) return;
+    production.push(T.n + "(" + b.x + "," + b.y + ") p=" + Math.floor((b.p || 0) * 100) + "% st=" + (b.st || "-") +
+      " prog=" + (b.prog || 0).toFixed(2) + " cash=" + Math.floor(b.cash || 0) +
+      " in=" + JSON.stringify(rd(b.in)) + " out=" + JSON.stringify(rd(b.out)));
+  });
   $("#debug").textContent =
     "DEBUG PANEL  [D 關閉]\n" +
     "時間：" + (Math.floor(S.t / 360) + 1) + " 日 / " + hr().toFixed(2) + " 時\n" +
     "道路總數：" + allRoads + "｜河岸連通：" + connected + "｜未連通：" + disconnected + "\n" +
     "居民：" + residents.size + "｜活躍：" + activeResidents.size + "｜移動中：" + activeMoving + "\n" +
     "建築：" + countB() + "｜低資金生產建築：" + lowCash + "\n" +
-    "鎮庫：" + Math.floor(S.m) + "｜居民財產：" + Math.floor(S.rp) + "\n" +
+    "鎮庫：" + Math.floor(S.m) + "｜居民財產：" + Math.floor(S.rp) + "\n\n" +
+    "【生產建築】\n" + (production.join("\n") || "無") + "\n\n" +
     "連通規則：從河道兩岸入口 BFS；未連通道路不納入居民路徑。";
 }
 addEventListener("keydown", e => {
