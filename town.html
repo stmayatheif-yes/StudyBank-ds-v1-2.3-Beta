@@ -67,10 +67,21 @@ button,a{font:inherit;color:var(--ink)}
 .r-link{text-decoration:underline;cursor:pointer;font-weight:bold}
 .chron-item{padding:5px 0;border-bottom:1px dashed rgba(29,58,53,.18)}
 .chron-tag{display:inline-block;padding:1px 6px;border-radius:6px;background:rgba(211,154,47,.3);font-size:.75rem;margin-right:6px}
-#stageBadge{font-size:.74rem;padding:1px 6px;border-radius:6px;background:rgba(211,154,47,.35);border:1px solid rgba(138,95,18,.35);margin-left:6px;vertical-align:middle}
+#stageBadge{font-size:.74rem;padding:2px 7px;border-radius:6px;background:rgba(211,154,47,.38);border:1px solid rgba(138,95,18,.4);margin-left:6px;vertical-align:middle;cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+#stageBadge:active{transform:scale(.96)}
+#stageModal{position:fixed;left:8px;right:8px;top:calc(104px + env(safe-area-inset-top,0px));max-height:70vh;display:none;flex-direction:column;padding:12px;overflow:hidden;z-index:7}
+#stageModal .eh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+#stageModal button{padding:5px 12px;border-radius:8px;border:1px solid rgba(29,58,53,.3);background:transparent;cursor:pointer}
+#stageBody{overflow:auto;font-size:.86rem;line-height:1.68}
+#stageBody table{width:100%;border-collapse:collapse;margin:6px 0}
+#stageBody th,#stageBody td{text-align:left;padding:4px 5px;border-bottom:1px solid rgba(29,58,53,.15);font-size:.82rem}
+.stg-cur{background:rgba(211,154,47,.22);font-weight:bold}
+.stg-box{padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.35);border:1px solid rgba(29,58,53,.16);margin:6px 0}
+.stg-ok{color:#2e6f40;font-weight:bold}
+.stg-lack{color:#a8382b;font-weight:bold}
 #bRoster,#bChron,#bObs{padding:3px 8px;font-size:.78rem;background:transparent;border-radius:8px;cursor:pointer;border:1px solid rgba(29,58,53,.3)}
 #obsExit{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:none;padding:8px 14px;font-size:.86rem;z-index:30;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.18)}
-body.obs #top,body.obs #zoom,body.obs #bar,body.obs #sub,body.obs #card,body.obs #eco,body.obs #roster,body.obs #chron,body.obs #resCard,body.obs #debug{display:none!important}
+body.obs #top,body.obs #zoom,body.obs #bar,body.obs #sub,body.obs #card,body.obs #eco,body.obs #roster,body.obs #chron,body.obs #stageModal,body.obs #resCard,body.obs #debug{display:none!important}
 body.obs #obsExit{display:flex;align-items:center;gap:6px}
 </style>
 </head>
@@ -79,7 +90,7 @@ body.obs #obsExit{display:flex;align-items:center;gap:6px}
 <div id="top">
   <div class="row">
     <a class="pn b" id="backToBank" href="./index.html">← 題庫</a>
-    <div class="pn" id="hud"><div><b>山河築夢</b><span id="stageBadge">荒野聚落</span></div><span id="clk"></span></div>
+    <div class="pn" id="hud"><div><b>山河築夢</b><span id="stageBadge" title="點擊查看城鎮規模與晉升條件">荒野聚落 ▾</span></div><span id="clk"></span></div>
     <button class="pn b" id="bSpd" aria-label="遊戲速度">1×</button>
     <button class="pn b" id="bPause">暫停</button>
   </div>
@@ -100,6 +111,7 @@ body.obs #obsExit{display:flex;align-items:center;gap:6px}
 <div id="eco" class="pn"><div class="eh"><b>經濟統計</b><button id="ecoX">關閉</button></div><div id="ecoBody"></div></div>
 <div id="roster" class="pn"><div class="eh"><b>全鎮人口名冊</b><div><select id="rosterFilter"><option value="all">全部居民</option><option value="unemployed">待業中</option><option value="employed">已就業</option><option value="child">未成年</option></select> <button id="rosterAutoJob">一鍵補缺</button> <button id="rosterX">關閉</button></div></div><div id="rosterBody"></div></div>
 <div id="chron" class="pn"><div class="eh"><b>城鎮編年史</b><button id="chronX">關閉</button></div><div id="chronBody"></div></div>
+<div id="stageModal" class="pn"><div class="eh"><b>城鎮規模與晉升指南</b><button id="stageX">關閉</button></div><div id="stageBody"></div></div>
 <div id="resCard" class="pn"><div class="rh"><b id="resName">居民</b><button id="resX">關閉</button></div><div class="body" id="resBody"></div></div>
 <div id="debug" class="pn"></div>
 <div id="sub" class="pn"></div>
@@ -274,14 +286,33 @@ let bridges = new Set();
 let townStage = 0; // 0: 荒野聚落, 1: 繁榮村落, 2: 商業城鎮, 3: 繁華都會
 let chronicle = []; // [{ day, tag, text }]
 let milestones = {}; // track one-time historical milestones
-let rosterOpen = false, chronOpen = false, obsMode = false;
+let rosterOpen = false, chronOpen = false, stageOpen = false, obsMode = false;
 let obsAngle = 0, obsTarget = null, obsTimer = 0;
 const STAGES = [
-  { name: "荒野聚落", desc: "河畔初闢，炊煙初起" },
-  { name: "繁榮村落", desc: "人口達 8 人，且有農田與商鋪運作" },
-  { name: "商業城鎮", desc: "人口達 20 人，商業與作坊齊備、公庫充盈" },
-  { name: "繁華都會", desc: "人口達 45 人，百業興旺、幸福度 70% 以上" }
+  { name: "荒野聚落", short: "荒野", desc: "河畔初闢，炊煙初起（初始規模）", req: { pop: 0, food: 0, hap: 0, money: 0, shops: 0, works: 0, farms: 0, parks: 0 } },
+  { name: "繁榮村落", short: "繁榮", desc: "人口 ≥ 8、糧食 ≥ 15、農田 ≥ 1、商鋪或作坊 ≥ 1", req: { pop: 8, food: 15, hap: 0, money: 0, shopsOrWorks: 1, farms: 1 } },
+  { name: "商業城鎮", short: "商業", desc: "人口 ≥ 20、糧食 ≥ 40、鎮庫 ≥ 800、商鋪 ≥ 2、作坊 ≥ 2", req: { pop: 20, food: 40, hap: 0, money: 800, shops: 2, works: 2 } },
+  { name: "繁華都會", short: "繁華", desc: "人口 ≥ 45、糧食 ≥ 80、幸福 ≥ 70%、鎮庫 ≥ 2000、商鋪 ≥ 4、作坊 ≥ 3、園景 ≥ 3", req: { pop: 45, food: 80, hap: 70, money: 2000, shops: 4, works: 3, parks: 3 } }
 ];
+
+function getTownMetrics() {
+  let shops = 0, works = 0, farms = 0, parks = 0;
+  forEachB(b => {
+    if (b.p < 1 || !ok(b)) return;
+    const cat = TY[b.t].cat;
+    if (cat === "shop") shops++;
+    else if (cat === "work") works++;
+    else if (cat === "farm") farms++;
+    else if (cat === "park") parks++;
+  });
+  return {
+    pop: residents.size,
+    food: Math.floor(ECO.food || 0),
+    hap: Math.round(ECO.hap || 0),
+    money: Math.floor(S.m || 0),
+    shops, works, farms, parks
+  };
+}
 
 
 function addChronicle(tag, text, key) {
@@ -295,20 +326,11 @@ function addChronicle(tag, text, key) {
 }
 
 function evalTownStage() {
-  const pop = residents.size;
-  let shops = 0, works = 0, farms = 0, parks = 0;
-  forEachB(b => {
-    if (b.p < 1 || !ok(b)) return;
-    const cat = TY[b.t].cat;
-    if (cat === "shop") shops++;
-    else if (cat === "work") works++;
-    else if (cat === "farm") farms++;
-    else if (cat === "park") parks++;
-  });
+  const m = getTownMetrics();
   let nextStage = 0;
-  if (pop >= 45 && shops >= 4 && works >= 3 && parks >= 3 && ECO.hap >= 70 && S.m >= 2000) nextStage = 3;
-  else if (pop >= 20 && shops >= 2 && works >= 2 && S.m >= 800) nextStage = 2;
-  else if (pop >= 8 && (shops >= 1 || works >= 1) && farms >= 1) nextStage = 1;
+  if (m.pop >= 45 && m.food >= 80 && m.hap >= 70 && m.money >= 2000 && m.shops >= 4 && m.works >= 3 && m.parks >= 3) nextStage = 3;
+  else if (m.pop >= 20 && m.food >= 40 && m.money >= 800 && m.shops >= 2 && m.works >= 2) nextStage = 2;
+  else if (m.pop >= 8 && m.food >= 15 && (m.shops + m.works) >= 1 && m.farms >= 1) nextStage = 1;
 
   if (nextStage > townStage) {
     townStage = nextStage;
@@ -317,7 +339,7 @@ function evalTownStage() {
     say("🎉 城鎮晉升為「" + st.name + "」！");
   }
   const badge = $("#stageBadge");
-  if (badge) badge.textContent = STAGES[townStage].name;
+  if (badge) badge.textContent = STAGES[townStage].name + " ▾";
 }
 
 // ============================================================
@@ -1455,6 +1477,7 @@ function hud() {
   $("#clk").textContent = "第" + (Math.floor(S.t / 360) + 1) + "日 " + pad(hh) + ":" + pad(mm) + "・" + SH[Math.floor(((hh + 1) % 24) / 2)] + "時" + (dark(h) > .5 ? "・夜" : "");
   if (ecoOpen) renderEco();
   if (chronOpen) renderChronicle();
+  if (stageOpen) renderStageModal();
   if (debugOpen) renderDebug();
   if (resCardR) { if (!residents.has(resCardR.id)) { $("#resCard").style.display = "none"; resCardR = null; } else showResident(resCardR); }
 }
@@ -1463,6 +1486,7 @@ function closeAllModals() {
   ecoOpen = false; $("#eco").style.display = "none";
   rosterOpen = false; $("#roster").style.display = "none";
   chronOpen = false; $("#chron").style.display = "none";
+  stageOpen = false; $("#stageModal").style.display = "none";
   resCardR = null; $("#resCard").style.display = "none";
   hideCard();
 }
@@ -1576,6 +1600,57 @@ function renderChronicle() {
   ).join("");
   $("#chronBody").innerHTML = header + (items || "<p>尚無歷史紀錄。</p>");
 }
+
+function renderStageModal() {
+  const m = getTownMetrics();
+  const cur = STAGES[townStage];
+  const nxt = STAGES[townStage + 1];
+
+  const rows = STAGES.map((st, idx) =>
+    '<tr class="' + (idx === townStage ? "stg-cur" : "") + '"><td>' + (idx === townStage ? "▶ " : "") + st.name + '</td><td>' + st.desc + '</td></tr>'
+  ).join("");
+
+  let nextHtml = "";
+  if (nxt) {
+    const r = nxt.req;
+    const checks = [];
+    const lacks = [];
+    const addCheck = (label, have, need, unit) => {
+      if (!need) return;
+      const okFlag = have >= need;
+      checks.push('<li>' + label + '：<b>' + have + '</b> / ' + need + unit + ' ' + (okFlag ? '<span class="stg-ok">✓</span>' : '<span class="stg-lack">（缺 ' + (need - have) + unit + '）</span>') + '</li>');
+      if (!okFlag) lacks.push(label + ' ' + (need - have) + unit);
+    };
+    addCheck("人數達到", m.pop, r.pop, " 人");
+    addCheck("糧食達到", m.food, r.food, " 份");
+    addCheck("幸福達到", m.hap, r.hap, "%");
+    addCheck("鎮庫達到", m.money, r.money, " 文");
+    if (r.farms) addCheck("運作農田", m.farms, r.farms, " 座");
+    if (r.shopsOrWorks) addCheck("商鋪或作坊", m.shops + m.works, r.shopsOrWorks, " 座");
+    if (r.shops) addCheck("運作商鋪", m.shops, r.shops, " 座");
+    if (r.works) addCheck("運作作坊", m.works, r.works, " 座");
+    if (r.parks) addCheck("園景設施", m.parks, r.parks, " 座");
+
+    const lackSummary = lacks.length
+      ? '<span class="stg-lack">距離晉升「' + nxt.name + '」目前還缺：' + lacks.join("、") + '。</span>'
+      : '<span class="stg-ok">所有條件皆已達成，即將晉升為「' + nxt.name + '」！</span>';
+
+    nextHtml = '<div class="stg-box"><div>目前為 <b>' + cur.name + '</b>，要達到下一級「<b>' + nxt.name + '</b>」的需求：</div>' +
+      '<ul style="margin:4px 0 6px;padding-left:1.3em">' + checks.join("") + '</ul>' +
+      '<div>' + lackSummary + '</div></div>';
+  } else {
+    nextHtml = '<div class="stg-box">目前為最高規模「<b>' + cur.name + '</b>」，全鎮百業興旺、百姓安居樂業！</div>';
+  }
+
+  $("#stageBody").innerHTML =
+    '<p style="margin:0 0 6px">全鎮共 <b>4 種規模</b>，分別為：<b>荒野聚落</b>、<b>繁榮村落</b>、<b>商業城鎮</b>、<b>繁華都會</b>。</p>' +
+    nextHtml +
+    '<table><tr><th>規模等級</th><th>晉升標準</th></tr>' + rows + '</table>';
+}
+
+$("#stageBadge").onclick = () => { closeAllModals(); stageOpen = true; $("#stageModal").style.display = "flex"; renderStageModal(); };
+$("#stageX").onclick = () => { stageOpen = false; $("#stageModal").style.display = "none"; };
+
 $("#bChron").onclick = () => { closeAllModals(); chronOpen = true; $("#chron").style.display = "flex"; renderChronicle(); };
 $("#chronX").onclick = () => { chronOpen = false; $("#chron").style.display = "none"; };
 
