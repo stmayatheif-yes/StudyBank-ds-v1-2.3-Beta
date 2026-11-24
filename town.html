@@ -571,12 +571,12 @@ function load() {
     if (d.cam) { cam.x = d.cam.x; cam.y = d.cam.y; Z = d.cam.z || Z; }
     if (d.sel) sel = Object.assign(sel, d.sel); if (d.tool) tool = d.tool; if (d.sp) { speed = d.sp; $("#bSpd").textContent = speed + "×"; }
     residents.forEach(r => {
-      const hb = r.houseKey != null ? bm.get(r.houseKey) : null;
-      const hh = r.familyId != null ? households.get(r.familyId) : null;
-      const idx = hh ? Math.max(0, hh.members.indexOf(r.id)) : 0;
-      if (hb) placeResidentAtHome(r, hb, idx);
-      else if (CR.length) { const k = CR[0]; r.x = k % N + .5; r.y = (k / N) + .5; }
-    });
+  const hb = r.houseKey != null ? bm.get(r.houseKey) : null;
+  const hh = r.familyId != null ? households.get(r.familyId) : null;
+  const idx = hh ? Math.max(0, hh.members.indexOf(r.id)) : 0;
+  if (hb) placeResidentAtHome(r, hb, idx);
+  else { r.x = DOCK.x - 1 + Math.random() * 2; r.y = DOCK.y - 1 + Math.random() * 2; }
+});
     return true;
   } catch (e) { console.warn(e); return false; }
 }
@@ -1098,7 +1098,18 @@ let had = load();
 if (!had && migrateV4()) { had = true; home(); save(); }
 if (!had) fresh();
 genChunk(...cOf(DOCK.x, DOCK.y));
-calcConn(); updateActiveSet(); clampCam(); renderSub(); updBar();
+calcConn();
+// 道路連通後，把沒房子的居民散到連通道路上
+if (CR.length) {
+  residents.forEach(r => {
+    if (r.houseKey == null || !bm.get(r.houseKey)) {
+      const k = CR[Math.random() * CR.length | 0];
+      r.x = (k % N) + .3 + Math.random() * .4;
+      r.y = ((k / N) | 0) + .3 + Math.random() * .4;
+    }
+  });
+}
+updateActiveSet(); clampCam(); renderSub(); updBar();
 if (!had) introOpen = true; else $("#intro").style.display = "none";
 $("#go").onclick = () => { introOpen = false; $("#intro").style.display = "none"; save(); };
 let last = 0;
