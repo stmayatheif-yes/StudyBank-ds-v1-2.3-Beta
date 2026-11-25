@@ -1343,7 +1343,12 @@ function act(x, y) {
     let best = null, bd = .7;
     residents.forEach(r => { if (!activeResidents.has(r.id)) return; const d = Math.hypot(r.x - x - .5, r.y - y - .5); if (d < bd) { bd = d; best = r; } });
     if (best) { showResident(best); return; }
-    if (b) showCard(b); else { hideCard(); say(isW(x, y) ? "河水" : hasRoad(x, y) ? (conn.has(K(x, y)) ? "青石路" : "青石路（還沒接到河岸）") : "空地"); }
+    if (b) showCard(b); else {
+  hideCard();
+  const zn = getZone(x, y);
+  const znTag = (zn && TY[zn]) ? "・[" + TY[zn].n + "]" : "";
+  say((isW(x, y) ? "河水" : hasRoad(x, y) ? (conn.has(K(x, y)) ? "青石路" : "青石路（還沒接到河岸）") : "空地") + znTag);
+}
     return;
   }
   if (tool === "del") {
@@ -1866,7 +1871,11 @@ function draw(ts) {
   for (let s = s0; s <= s1; s++) for (let d = d0 + (((s + d0) % 2) + 2) % 2; d <= d1; d += 2) {
     const x = (s + d) / 2, y = (s - d) / 2; if (!inW(x, y)) continue;
     if (isW(x, y)) { tile(x, y, WC[(((Math.sin(ts / 700 + x * .8 + y * .5) + 1) * 3.5) | 0)]); if (bridges.has(K(x, y))) bridgeTile(x, y); }
-    else if (hasRoad(x, y)) tile(x, y, conn.has(K(x, y)) ? "#c9c4b1" : "#bcb7a5", "#9a9582");
+    else if (hasRoad(x, y)) {
+  tile(x, y, conn.has(K(x, y)) ? "#c9c4b1" : "#bcb7a5", "#9a9582");
+  const zn = getZone(x, y);
+  if (zn && TY[zn]) tile(x, y, TY[zn].color, TY[zn].stroke);
+}
     else {
       const b = terrainAt(x, y) || "meadow"; const curGR = GR_SEASON[getCurSeason()] || GR_SEASON[0]; const pal = curGR[b] || curGR.meadow;
       tile(x, y, pal[hs(x, y) % 3]);
